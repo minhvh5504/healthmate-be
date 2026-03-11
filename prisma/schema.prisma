@@ -1,0 +1,398 @@
+// OMMS - Order Management Multi-venue System
+// Resort Restaurant Ordering Platform
+// Learn more: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider        = "prisma-client-js"
+  output          = "../node_modules/.prisma/client"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum Role {
+  ADMIN
+  STAFF
+  KITCHEN
+  BAR
+}
+
+enum VenueType {
+  RESTAURANT
+  BAR
+  ROOM_SERVICE
+}
+
+enum OrderStatus {
+  DRAFT // Đang chọn món (chưa submit)
+  CREATED_PENDING_CONFIRM // Đã đặt, chờ staff xác nhận
+  CONFIRMED // Staff đã xác nhận
+  REJECTED // Staff từ chối
+  IN_PREP // Đang chuẩn bị/nấu
+  READY // Món sẵn sàng
+  SERVED // Đã phục vụ
+  CANCELLED // Đã hủy
+}
+
+enum GuestType {
+  ROOM // Room guest (nhập số phòng)
+  ON_PREMISE // On-premise guest (tại bàn)
+}
+
+enum ServiceAreaType {
+  TABLE
+  ROOM
+}
+
+enum QRCodeType {
+  ORDER // Khách có thể đặt món
+  VIEW_ONLY // Khách chỉ xem menu
+}
+
+enum OrderItemStatus {
+  PENDING // Chưa nấu
+  COOKING // Đang nấu
+  READY // Sẵn sàng
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum VerificationType {
+  EMAIL_VERIFICATION
+  PHONE_VERIFICATION
+  PASSWORD_RESET
+}
+
+// ============================================
+// CORE ENTITIES
+// ============================================
+
+model User {
+  id       String  @id @default(uuid())
+  email    String? @unique // Optional for phone-only registration, required for OAuth
+  password String? // Optional for OAuth users
+  role     Role    @default(STAFF)
+
+  fullName    String
+  phone       String?   @unique // Primary identifier for form registration
+  avatar      String?
+  dateOfBirth DateTime? @db.Date
+  gender      Gender?
+  address     String?
+
+  // Phone verification (for form registration)
+  phoneVerified Boolean @default(false)
+  emailVerified Boolean @default(false) // For OAuth users
+
+  // Google OAuth fields
+  googleId String? @unique // Google user ID
+  picture  String? // Google profile picture URL
+
+  // For KITCHEN/BAR users - assigned to specific venue/station
+  venueId String?
+
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  // Relations
+  venue             Venue?              @relation(fields: [venueId], references: [id])
+  confirmations     OrderConfirmation[]
+  verificationCodes VerificationCode[]
+  refreshTokens     RefreshToken[]
+
+  @@index([email])
+  @@index([phone])
+  @@index([googleId])
+  @@index([role, isActive])
+  @@index([venueId])
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  isRevoked Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@map("refresh_tokens")
+}
+
+model VerificationCode {
+  id        String           @id @default(uuid())
+  userId    String
+  code      String
+  type      VerificationType
+  phone     String? // Store phone number for phone verification
+  expiresAt DateTime
+  isUsed    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type, isUsed])
+  @@index([code])
+  @@index([phone])
+  @@map("verification_codes")
+}
+
+// ============================================
+// VENUE MANAGEMENT
+// ============================================
+
+model Venue {
+  id             String    @id @default(uuid())
+  name           String
+  type           VenueType
+  description    String?
+  isActive       Boolean   @default(true)
+  isAppOrderable Boolean   @default(true) // Pool Bar = false (staff-assisted only)
+  displayOrder   Int       @default(0)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  // Relations
+  dishes       Dish[]
+  serviceAreas ServiceArea[]
+  orders       Order[]
+  routings     OrderRouting[]
+  users        User[] // Kitchen/Bar staff assigned to this venue
+
+  @@index([isActive, displayOrder])
+  @@index([type])
+  @@map("venues")
+}
+
+// ============================================
+// MENU MANAGEMENT
+// ============================================
+
+model Category {
+  id           String  @id @default(uuid())
+  name         String
+  description  String?
+  displayOrder Int     @default(0)
+  isActive     Boolean @default(true)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  // Relations
+  dishes Dish[]
+
+  @@index([isActive, displayOrder])
+  @@map("categories")
+}
+
+model Dish {
+  id          String  @id @default(uuid())
+  categoryId  String
+  venueId     String // Venue-specific menu
+  name        String
+  description String?
+  price       Decimal @db.Decimal(10, 2)
+  imageUrl    String?
+  isAvailable Boolean @default(true)
+  isActive    Boolean @default(true)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  // Relations
+  category   Category    @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  venue      Venue       @relation(fields: [venueId], references: [id], onDelete: Restrict)
+  orderItems OrderItem[]
+
+  @@index([categoryId])
+  @@index([venueId])
+  @@index([isAvailable, isActive])
+  @@index([name])
+  @@map("dishes")
+}
+
+// ============================================
+// SERVICE AREAS (Tables & Rooms)
+// ============================================
+
+model ServiceArea {
+  id          String          @id @default(uuid())
+  type        ServiceAreaType
+  venueId     String? // Optional: link table to specific venue
+  name        String
+  description String?
+  isActive    Boolean         @default(true)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  // Relations
+  venue  Venue?  @relation(fields: [venueId], references: [id])
+  orders Order[]
+  qrCode QRCode?
+
+  @@index([type, isActive])
+  @@index([venueId])
+  @@index([name])
+  @@map("service_areas")
+}
+
+model QRCode {
+  id            String     @id @default(uuid())
+  serviceAreaId String     @unique
+  venueId       String? // Link QR to specific venue
+  code          String     @unique
+  type          QRCodeType
+  isActive      Boolean    @default(true)
+  scannedCount  Int        @default(0)
+  lastScannedAt DateTime?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  // Relations
+  serviceArea ServiceArea @relation(fields: [serviceAreaId], references: [id], onDelete: Cascade)
+
+  @@index([code])
+  @@index([type, isActive])
+  @@index([venueId])
+  @@map("qr_codes")
+}
+
+// ============================================
+// ORDER MANAGEMENT
+// ============================================
+
+model Order {
+  id            String      @id @default(uuid())
+  orderNumber   String      @unique
+  serviceAreaId String
+  venueId       String
+  totalAmount   Decimal     @db.Decimal(10, 2)
+  status        OrderStatus @default(CREATED_PENDING_CONFIRM)
+  guestType     GuestType
+
+  // Guest ordering - no authentication required
+  guestName  String?
+  guestPhone String?
+
+  // Anti-fake controls
+  deviceFingerprint String?
+  ipAddress         String?
+
+  notes           String?
+  cancelledReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  serviceArea  ServiceArea        @relation(fields: [serviceAreaId], references: [id], onDelete: Restrict)
+  venue        Venue              @relation(fields: [venueId], references: [id], onDelete: Restrict)
+  orderItems   OrderItem[]
+  confirmation OrderConfirmation?
+  routing      OrderRouting?
+
+  @@index([orderNumber])
+  @@index([serviceAreaId])
+  @@index([venueId])
+  @@index([status, createdAt])
+  @@index([createdAt])
+  @@index([guestType])
+  @@index([deviceFingerprint])
+  @@index([ipAddress])
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String          @id @default(uuid())
+  orderId   String
+  dishId    String
+  dishName  String // Snapshot at order time
+  dishPrice Decimal         @db.Decimal(10, 2)
+  quantity  Int
+  subtotal  Decimal         @db.Decimal(10, 2)
+  notes     String?
+  status    OrderItemStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  dish  Dish  @relation(fields: [dishId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([dishId])
+  @@index([status])
+  @@map("order_items")
+}
+
+// ============================================
+// CONFIRMATION GATE
+// ============================================
+
+model OrderConfirmation {
+  id              String      @id @default(uuid())
+  orderId         String      @unique
+  confirmedById   String
+  status          OrderStatus // CONFIRMED or REJECTED
+  rejectionReason String? // Required if REJECTED
+
+  confirmedAt DateTime @default(now())
+
+  // Relations
+  order       Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  confirmedBy User  @relation(fields: [confirmedById], references: [id])
+
+  @@index([orderId])
+  @@index([confirmedById])
+  @@index([status])
+  @@index([confirmedAt])
+  @@map("order_confirmations")
+}
+
+// ============================================
+// ORDER ROUTING
+// ============================================
+
+model OrderRouting {
+  id            String @id @default(uuid())
+  orderId       String @unique
+  venueId       String
+  targetStation String // "Thai Kitchen", "Palm Kitchen", "Lobby Bar", "Pool Bar", "Room Service Kitchen"
+
+  routedAt DateTime @default(now())
+
+  // Relations
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  venue Venue @relation(fields: [venueId], references: [id])
+
+  @@index([orderId])
+  @@index([venueId])
+  @@index([targetStation])
+  @@index([routedAt])
+  @@map("order_routings")
+}
