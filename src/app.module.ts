@@ -1,0 +1,53 @@
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { PrismaModule } from './modules/prisma/prisma.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { RealtimeModule } from './modules/realtime/realtime.module';
+import { UploadModule } from './modules/upload/upload.module';
+import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
+
+@Module({
+  imports: [
+    // Configuration
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: '.env',
+    }),
+
+    // Throttler for rate limiting
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000, // 1 minute
+        limit: 10, // 10 requests per minute
+      },
+    ]),
+
+    // Global modules
+    PrismaModule,
+
+    // Feature modules
+    AuthModule,
+    UploadModule,
+    RealtimeModule,
+  ],
+  providers: [
+    // Global guard - apply JWT auth to all routes by default
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
+    // Global throttler guard for rate limiting
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
+})
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    // Apply anti-fake middleware to order creation endpoint
+    // consumer.apply(AntiFakeMiddleware).forRoutes('orders');
+  }
+}
