@@ -166,6 +166,54 @@ export class MailService {
   }
 
   /**
+   * Send OTP email for registration (email-only flow)
+   */
+  async sendOtpEmail(email: string, code: string): Promise<void> {
+    const subject = 'Mã xác thực đăng ký - Healthmate';
+    const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+            .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+            .otp-code { background: white; border: 2px dashed #667eea; padding: 20px; text-align: center; font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #667eea; margin: 20px 0; border-radius: 8px; }
+            .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #888; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>🏥 Healthmate</h1>
+              <p>Xác thực Email</p>
+            </div>
+            <div class="content">
+              <h2>Xin chào! 👋</h2>
+              <p>Cảm ơn bạn đã đăng ký tài khoản Healthmate. Vui lòng dùng mã OTP bên dưới để xác thực email của bạn:</p>
+
+              <div class="otp-code">${code}</div>
+
+              <p><strong>Mã này sẽ hết hạn sau 5 phút.</strong></p>
+
+              <p>Nếu bạn không yêu cầu mã này, vui lòng bỏ qua email này.</p>
+
+              <p>Trân trọng,<br>Healthmate Team</p>
+            </div>
+            <div class="footer">
+              <p>Đây là email tự động. Vui lòng không trả lời.</p>
+              <p>&copy; 2025 Healthmate. All rights reserved.</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+
+    await this.sendMail(email, subject, html, undefined, code);
+  }
+
+  /**
    * Public method to send email (for NotificationsService)
    */
   async sendMail(

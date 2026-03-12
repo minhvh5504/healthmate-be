@@ -1,25 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, MinLength, MaxLength, Matches } from 'class-validator';
+import { IsEmail, IsString, MinLength, MaxLength } from 'class-validator';
 
 export class RegisterDto {
   @ApiProperty({
-    example: '0901234567',
-    description: 'Phone number (10-11 digits, Vietnamese format)',
+    example: 'joyhn@example.com',
+    description: 'Email address of the user',
   })
-  @IsString()
-  @Matches(/^0[0-9]{9,10}$/, {
-    message: 'Phone number must be 10-11 digits and start with 0',
-  })
-  phone: string;
-
-  @ApiProperty({
-    example: 'Nguyễn Văn A',
-    description: 'Full name of the user',
-  })
-  @IsString()
-  @MinLength(2, { message: 'Full name must be at least 2 characters' })
-  @MaxLength(100, { message: 'Full name is too long' })
-  fullName: string;
+  @IsEmail({}, { message: 'Invalid email address' })
+  email: string;
 
   @ApiProperty({
     example: 'Password123!',
