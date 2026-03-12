@@ -17,7 +17,6 @@ import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
-import { VerifyPhoneDto } from './dto/verify-phone.dto';
 import { ResendOtpDto } from './dto/resend-otp.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { GoogleOAuthDto } from './dto/google-oauth.dto';
@@ -28,47 +27,32 @@ import { Public } from '../../common/decorators/public.decorator';
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) { }
 
   @Public()
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
-    summary: 'Register a new user with phone - Sends OTP to phone',
+    summary: 'Register a new user with email - Sends OTP to email',
   })
   @ApiResponse({
     status: 201,
-    description: 'Registration successful, OTP sent to phone',
+    description: 'Registration successful, OTP sent to email',
   })
   @ApiResponse({
     status: 409,
-    description: 'Phone already registered',
+    description: 'Email already registered',
   })
   async register(@Body() registerDto: RegisterDto) {
     return this.authService.register(registerDto);
   }
 
-  @Public()
-  @Post('verify-phone')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Verify phone with OTP code' })
-  @ApiResponse({
-    status: 200,
-    description: 'Phone verified successfully, returns tokens',
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Invalid or expired OTP',
-  })
-  async verifyPhone(@Body() verifyPhoneDto: VerifyPhoneDto) {
-    return this.authService.verifyPhone(verifyPhoneDto);
-  }
 
   @Public()
   @Post('verify-email')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Verify email with OTP code (backward compatibility)',
+    summary: 'Verify email with OTP code',
   })
   @ApiResponse({
     status: 200,
@@ -85,7 +69,7 @@ export class AuthController {
   @Public()
   @Post('resend-otp')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Resend OTP verification code to phone' })
+  @ApiOperation({ summary: 'Resend OTP verification code to email' })
   @ApiResponse({
     status: 200,
     description: 'OTP sent successfully',
@@ -101,14 +85,14 @@ export class AuthController {
   @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Login user with phone or email' })
+  @ApiOperation({ summary: 'Login user with email' })
   @ApiResponse({
     status: 200,
     description: 'Login successful, returns access and refresh tokens',
   })
   @ApiResponse({
     status: 401,
-    description: 'Invalid credentials or phone not verified',
+    description: 'Invalid credentials or email not verified',
   })
   async login(@Body() loginDto: LoginDto) {
     return this.authService.login(loginDto);

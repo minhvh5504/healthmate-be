@@ -27,7 +27,6 @@ export interface TokenPair {
 interface JwtPayload {
   sub: string;
   email: string | null;
-  phone: string | null;
 }
 
 @Injectable()
@@ -54,7 +53,6 @@ export class AuthService {
   private async createVerificationCode(
     userId: string,
     type: VerificationType,
-    phone?: string,
   ): Promise<string> {
     const code = this.generateOtpCode();
     const expiresAt = new Date();
@@ -65,7 +63,6 @@ export class AuthService {
         userId,
         code,
         type,
-        phone,
         expiresAt,
       },
     });
@@ -79,9 +76,8 @@ export class AuthService {
   private async generateTokenPair(
     userId: string,
     email: string | null,
-    phone: string | null,
   ): Promise<TokenPair> {
-    const payload: JwtPayload = { sub: userId, email, phone };
+    const payload: JwtPayload = { sub: userId, email };
 
     // Generate access token
     const accessToken = this.jwtService.sign(payload, {
@@ -118,23 +114,28 @@ export class AuthService {
   }
 
   /**
-   * Register a new user (default role: PATIENT)
+   * Generate default fullName like Joyer.123456
    */
+  private generateDefaultFullName(): string {
+    const randomNum = Math.floor(100000 + Math.random() * 900000);
+    return `Joyer.${randomNum}`;
+  }
+
   /**
-   * Register a new user with phone number
+   * Register a new user with email
    */
   async register(registerDto: RegisterDto) {
-    const { phone, password, fullName } = registerDto;
+    const { email, password } = registerDto;
 
-    // Check if phone already exists
+    // Check if email already exists
     const existingUser = await this.prisma.user.findUnique({
-      where: { phone },
+      where: { email },
     });
 
     if (existingUser) {
       throw new ApiException(
-        'AUTH.REGISTER.PHONE_EXISTS',
-        'Phone number already registered',
+        'AUTH.REGISTER.EMAIL_EXISTS',
+        'Email already registered',
         409,
         'Register failed',
       );
@@ -143,120 +144,36 @@ export class AuthService {
     // Hash password
     const hashedPassword = await this.hashPassword(password);
 
-    // Create user with phoneVerified = false
+    // Create user with emailVerified = false
     const user = await this.prisma.user.create({
       data: {
-        phone,
+        email,
         password: hashedPassword,
-        fullName,
-        role: Role.STAFF,
-        phoneVerified: false,
-        isActive: true, // Active but phone not verified
+        fullName: this.generateDefaultFullName(),
+        role: Role.USER,
+        emailVerified: false,
+        isActive: true,
       },
     });
 
     // Generate OTP code
     const otpCode = await this.createVerificationCode(
       user.id,
-      VerificationType.PHONE_VERIFICATION,
-      phone,
+      VerificationType.EMAIL_VERIFICATION,
     );
 
-    // Send OTP via SMS
-    await this.smsService.sendOtp(phone, otpCode);
+    // Send OTP via email
+    await this.mailService.sendOtpEmail(email, otpCode);
 
     return ResponseHelper.success(
-      { phone },
+      { email },
       MessageCodes.REGISTER_SUCCESS,
-      'Register successfully! Please check your phone to verify the phone number.',
+      'Register successfully! Please check your email to verify your account.',
       201,
     );
   }
 
-  /**
-   * Verify phone with OTP code
-   */
-  async verifyPhone(verifyPhoneDto: VerifyPhoneDto) {
-    const { phone, otp } = verifyPhoneDto;
 
-    // Find user by phone
-    const user = await this.prisma.user.findUnique({
-      where: { phone },
-    });
-
-    if (!user) {
-      throw new ApiException(
-        MessageCodes.USER_NOT_FOUND,
-        'User not found',
-        404,
-        'Verify phone failed',
-      );
-    }
-
-    // Find verification code
-    const verificationCode = await this.prisma.verificationCode.findFirst({
-      where: {
-        userId: user.id,
-        code: otp,
-        type: VerificationType.PHONE_VERIFICATION,
-        phone,
-        isUsed: false,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    if (!verificationCode) {
-      throw new ApiException(
-        MessageCodes.INVALID_OTP,
-        'Invalid OTP code',
-        400,
-        'Verify phone failed',
-      );
-    }
-
-    // Check if code is expired
-    if (new Date() > verificationCode.expiresAt) {
-      throw new ApiException(
-        MessageCodes.OTP_EXPIRED,
-        'OTP code has expired',
-        400,
-        'Verify phone failed',
-      );
-    }
-
-    // Mark code as used and verify phone
-    await this.prisma.$transaction([
-      this.prisma.verificationCode.update({
-        where: { id: verificationCode.id },
-        data: { isUsed: true },
-      }),
-      this.prisma.user.update({
-        where: { id: user.id },
-        data: { phoneVerified: true },
-      }),
-    ]);
-
-    // Generate tokens
-    const tokens = await this.generateTokenPair(
-      user.id,
-      user.email,
-      user.phone,
-    );
-
-    // Remove password from response
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password: _password, ...userWithoutPassword } = user;
-
-    return ResponseHelper.success(
-      {
-        user: { ...userWithoutPassword, phoneVerified: true },
-        ...tokens,
-      },
-      MessageCodes.VERIFY_SUCCESS,
-      'Verify phone successfully!',
-      200,
-    );
-  }
 
   /**
    * Verify email with OTP code (kept for backward compatibility)
@@ -329,7 +246,6 @@ export class AuthService {
     const tokens = await this.generateTokenPair(
       user.id,
       user.email,
-      user.phone,
     );
 
     // Remove password from response
@@ -351,10 +267,10 @@ export class AuthService {
    * Resend OTP code
    */
   async resendOtp(resendOtpDto: ResendOtpDto) {
-    const { phone } = resendOtpDto;
+    const { email } = resendOtpDto;
 
     const user = await this.prisma.user.findUnique({
-      where: { phone },
+      where: { email },
     });
 
     if (!user) {
@@ -366,10 +282,10 @@ export class AuthService {
       );
     }
 
-    if (user.phoneVerified) {
+    if (user.emailVerified) {
       throw new ApiException(
         'AUTH.VERIFY.ALREADY_VERIFIED',
-        'Phone number already verified',
+        'Email already verified',
         400,
         'Resend OTP failed',
       );
@@ -378,17 +294,16 @@ export class AuthService {
     // Generate new OTP code
     const otpCode = await this.createVerificationCode(
       user.id,
-      VerificationType.PHONE_VERIFICATION,
-      phone,
+      VerificationType.EMAIL_VERIFICATION,
     );
 
-    // Send OTP via SMS
-    await this.smsService.sendOtp(phone, otpCode);
+    // Send OTP via email
+    await this.mailService.sendOtpEmail(email, otpCode);
 
     return ResponseHelper.success(
-      { phone },
+      { email },
       'AUTH.RESEND_OTP.SUCCESS',
-      'OTP code has been resent!',
+      'OTP code has been resent to your email!',
       200,
     );
   }
@@ -397,33 +312,40 @@ export class AuthService {
    * Login user
    */
   /**
-   * Login user with phone or email
+   * Login user with email
    */
   async login(loginDto: LoginDto) {
     const { identifier, password } = loginDto;
 
-    // Determine if identifier is phone or email
-    const isPhone = /^0[0-9]{9,10}$/.test(identifier);
-
-    // Find user by phone or email
+    // Find user by email
     const user = await this.prisma.user.findFirst({
-      where: isPhone ? { phone: identifier } : { email: identifier },
+      where: { email: identifier },
     });
 
     if (!user) {
       throw new ApiException(
         MessageCodes.INVALID_CREDENTIALS,
-        'Phone number/email or password is incorrect',
+        'Email or password is incorrect',
         401,
         'Login failed',
       );
     }
 
-    // Check if phone is verified (for phone login)
-    if (isPhone && !user.phoneVerified) {
+    // Check if account is active (not blocked by admin)
+    if (!user.isActive) {
+      throw new ApiException(
+        MessageCodes.ACCOUNT_DISABLED,
+        'Your account has been deactivated/blocked by admin',
+        401,
+        'Login failed',
+      );
+    }
+
+    // Check if email is verified
+    if (!user.emailVerified) {
       throw new ApiException(
         MessageCodes.ACCOUNT_NOT_VERIFIED,
-        'Please verify your phone number first',
+        'Please verify your email address first',
         401,
         'Login failed',
       );
@@ -458,7 +380,6 @@ export class AuthService {
     const tokens = await this.generateTokenPair(
       user.id,
       user.email,
-      user.phone,
     );
 
     // Remove password from response
@@ -514,18 +435,26 @@ export class AuthService {
           googleId: googleUser.googleId,
           picture: googleUser.picture,
           emailVerified: true,
-          phoneVerified: false, // OAuth users don't need phone verification
-          role: Role.STAFF,
+          role: Role.USER,
           isActive: true,
         },
       });
+    }
+
+    // Check if account is active (not blocked by admin)
+    if (!user.isActive) {
+      throw new ApiException(
+        MessageCodes.ACCOUNT_DISABLED,
+        'Your account has been deactivated/blocked by admin',
+        401,
+        'Login failed',
+      );
     }
 
     // Generate tokens
     const tokens = await this.generateTokenPair(
       user.id,
       user.email,
-      user.phone,
     );
 
     // Remove password from response
@@ -570,6 +499,16 @@ export class AuthService {
         );
       }
 
+      // Check if user is active
+      if (!storedToken.user.isActive) {
+        throw new ApiException(
+          MessageCodes.ACCOUNT_DISABLED,
+          'Your account has been deactivated/blocked by admin',
+          401,
+          'Token refresh failed',
+        );
+      }
+
       // Check if token is expired
       if (new Date() > storedToken.expiresAt) {
         throw new ApiException(
@@ -584,7 +523,6 @@ export class AuthService {
       const tokens = await this.generateTokenPair(
         payload.sub,
         payload.email,
-        payload.phone,
       );
 
       // Revoke old refresh token
@@ -636,7 +574,6 @@ export class AuthService {
         id: true,
         email: true,
         fullName: true,
-        phone: true,
         role: true,
         avatar: true,
         isActive: true,
