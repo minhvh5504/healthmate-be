@@ -315,11 +315,11 @@ export class AuthService {
    * Login user with email
    */
   async login(loginDto: LoginDto) {
-    const { identifier, password } = loginDto;
+    const { email, password } = loginDto;
 
     // Find user by email
     const user = await this.prisma.user.findFirst({
-      where: { email: identifier },
+      where: { email },
     });
 
     if (!user) {
