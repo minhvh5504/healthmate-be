@@ -20,6 +20,7 @@ import { VerifyEmailDto } from './dto/verify-email.dto';
 import { ResendOtpDto } from './dto/resend-otp.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { GoogleOAuthDto } from './dto/google-oauth.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
@@ -141,6 +142,23 @@ export class AuthController {
   async logout(@Body() refreshTokenDto: RefreshTokenDto) {
     return this.authService.logout(refreshTokenDto.refreshToken);
   }
+
+  @Public()
+  @Post('send-reset-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Request password reset - Sends OTP to email' })
+  @ApiResponse({
+    status: 200,
+    description: 'OTP reset password has been sent to email',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'User not found',
+  })
+  async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
+    return this.authService.sendResetPassword(forgotPasswordDto);
+  }
+
 
   @Get('profile')
   @UseGuards(JwtAuthGuard)

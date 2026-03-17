@@ -1,7 +1,3 @@
-// OMMS - Order Management Multi-venue System
-// Resort Restaurant Ordering Platform
-// Learn more: https://pris.ly/d/prisma-schema
-
 generator client {
   provider        = "prisma-client-js"
   output          = "../node_modules/.prisma/client"
@@ -12,57 +8,25 @@ datasource db {
   provider = "postgresql"
 }
 
-// ============================================
-// ENUMS
-// ============================================
-
-enum Role {
-  ADMIN
-  USER
-}
-
-
-enum Gender {
-  MALE
-  FEMALE
-  OTHER
-}
-
-enum VerificationType {
-  EMAIL_VERIFICATION
-  PASSWORD_RESET
-}
-
-// ============================================
-// CORE ENTITIES
-// ============================================
-
 model User {
-  id       String  @id @default(uuid())
-  email    String? @unique // Optional for phone-only registration, required for OAuth
-  password String? // Optional for OAuth users
-  role     Role    @default(USER)
-
-  fullName    String
-  avatar      String?
-  dateOfBirth DateTime? @db.Date
-  gender      Gender?
-  address     String?
-
-  emailVerified Boolean @default(false) // For OAuth users
-
-  // Google OAuth fields
-  googleId String? @unique // Google user ID
-  picture  String? // Google profile picture URL
-
-  isActive  Boolean   @default(true)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
-
-  // Relations
-  verificationCodes VerificationCode[]
+  id                String             @id @default(uuid())
+  email             String?            @unique
+  password          String?
+  role              Role               @default(USER)
+  fullName          String
+  avatar            String?
+  dateOfBirth       DateTime?          @db.Date
+  gender            Gender?
+  address           String?
+  emailVerified     Boolean            @default(false)
+  googleId          String?            @unique
+  picture           String?
+  isActive          Boolean            @default(true)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  deletedAt         DateTime?
   refreshTokens     RefreshToken[]
+  verificationCodes VerificationCode[]
 
   @@index([email])
   @@index([googleId])
@@ -77,8 +41,7 @@ model RefreshToken {
   expiresAt DateTime
   isRevoked Boolean  @default(false)
   createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([token])
@@ -93,11 +56,25 @@ model VerificationCode {
   expiresAt DateTime
   isUsed    Boolean          @default(false)
   createdAt DateTime         @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, type, isUsed])
   @@index([code])
   @@map("verification_codes")
 }
 
+enum Role {
+  ADMIN
+  USER
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum VerificationType {
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
+}

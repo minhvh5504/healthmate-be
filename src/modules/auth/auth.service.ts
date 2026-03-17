@@ -11,6 +11,8 @@ import { VerifyPhoneDto } from './dto/verify-phone.dto';
 import { ResendOtpDto } from './dto/resend-otp.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { GoogleOAuthDto } from './dto/google-oauth.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { Role, VerificationType } from '@prisma/client';
 import { ResponseHelper } from '../../common/interfaces/api-response.interface';
 import { MessageCodes } from '../../common/constants/message-codes.const';
@@ -545,6 +547,129 @@ export class AuthService {
         'Token refresh failed',
       );
     }
+  }
+
+  /**
+   * Forgot password - send OTP email
+   */
+  async forgotPassword(forgotPasswordDto: ForgotPasswordDto) {
+    const { email } = forgotPasswordDto;
+
+    // Find user
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      throw new ApiException(
+        MessageCodes.USER_NOT_FOUND,
+        'User with this email does not exist!',
+        404,
+        'Forgot password failed',
+      );
+    }
+
+    // Generate and store reset code
+    const code = await this.createVerificationCode(
+      user.id,
+      VerificationType.PASSWORD_RESET,
+    );
+
+    // Send email
+    await this.mailService.sendForgotPasswordEmail(
+      email,
+      user.fullName,
+      code,
+    );
+
+    return ResponseHelper.success(
+      { email },
+      MessageCodes.FORGOT_PASSWORD_SUCCESS,
+      'Otp reset password has been sent to email!',
+      200,
+    );
+  }
+
+  /**
+   * Reset password with OTP code
+   */
+  async resetPassword(resetPasswordDto: ResetPasswordDto) {
+    const { email, code, newPassword } = resetPasswordDto;
+
+    // Find user
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      throw new ApiException(
+        MessageCodes.USER_NOT_FOUND,
+        'User not found',
+        404,
+        'Reset password failed',
+      );
+    }
+
+    // Find verification code
+    const verificationCode = await this.prisma.verificationCode.findFirst({
+      where: {
+        userId: user.id,
+        code,
+        type: VerificationType.PASSWORD_RESET,
+        isUsed: false,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!verificationCode) {
+      throw new ApiException(
+        MessageCodes.INVALID_OTP,
+        'Invalid reset code',
+        400,
+        'Reset password failed',
+      );
+    }
+
+    // Check if code is expired
+    if (new Date() > verificationCode.expiresAt) {
+      throw new ApiException(
+        MessageCodes.OTP_EXPIRED,
+        'Reset code has expired',
+        400,
+        'Reset password failed',
+      );
+    }
+
+    // Hash new password
+    const hashedPassword = await this.hashPassword(newPassword);
+
+    // Update password and mark code as used
+    await this.prisma.$transaction([
+      this.prisma.verificationCode.update({
+        where: { id: verificationCode.id },
+        data: { isUsed: true },
+      }),
+      this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          password: hashedPassword,
+          // If user was using password reset, we can assume their email is verified
+          emailVerified: true,
+        },
+      }),
+      // Revoke all refresh tokens for security
+      this.prisma.refreshToken.updateMany({
+        where: { userId: user.id },
+        data: { isRevoked: true },
+      }),
+    ]);
+
+    return ResponseHelper.success(
+      null,
+      MessageCodes.RESET_PASSWORD_SUCCESS,
+      'Password has been reset successfully!',
+      200,
+    );
   }
 
   /**
