@@ -2,8 +2,8 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
-import { PrismaService } from '../prisma/prisma.service';
-import { MailService } from '../notifications/mail.service';
+import { PrismaService } from '../../prisma/prisma.service';
+import { MailService } from '../../notifications/mail.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
@@ -14,11 +14,11 @@ import { GoogleOAuthDto } from './dto/google-oauth.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { Role, VerificationType } from '@prisma/client';
-import { ResponseHelper } from '../../common/interfaces/api-response.interface';
-import { MessageCodes } from '../../common/constants/message-codes.const';
-import { ApiException } from '../../common/exceptions/api.exception';
+import { ResponseHelper } from '../../../common/interfaces/api-response.interface';
+import { MessageCodes } from '../../../common/constants/message-codes.const';
+import { ApiException } from '../../../common/exceptions/api.exception';
 import type { StringValue } from 'ms';
-import { MockSmsService } from './services/sms.service';
+import { MockSmsService } from '../../notifications/sms.service';
 import { GoogleOAuthService } from './services/google-oauth.service';
 
 export interface TokenPair {
