@@ -3,7 +3,7 @@ import { IsEmail, IsOptional, IsString, MaxLength, MinLength } from 'class-valid
 
 export class RegisterDto {
   @ApiProperty({
-    example: 'joyhn@example.com',
+    example: 'user@example.com',
     description: 'Email address of the user',
   })
   @IsEmail({}, { message: 'Invalid email address' })

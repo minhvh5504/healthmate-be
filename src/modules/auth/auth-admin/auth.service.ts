@@ -340,6 +340,14 @@ export class AuthAdminService {
 
     // Check if account is active
     if (!user.isActive) {
+      if (user.failedLoginAttempts && user.failedLoginAttempts >= 5) {
+        throw new ApiException(
+          MessageCodes.ACCOUNT_DISABLED,
+          'Your account has been locked due to too many failed login attempts. Please contact admin to unlock',
+          401,
+          'Login failed',
+        );
+      }
       throw new ApiException(
         MessageCodes.ACCOUNT_DISABLED,
         'Your account has been deactivated/blocked by admin',
@@ -365,12 +373,39 @@ export class AuthAdminService {
     );
 
     if (!isPasswordValid) {
-      throw new ApiException(
-        MessageCodes.INVALID_CREDENTIALS,
-        'Email or password is incorrect',
-        401,
-        'Login failed',
-      );
+      const failedAttempts = (user.failedLoginAttempts || 0) + 1;
+      
+      if (failedAttempts >= 5) {
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data: { failedLoginAttempts: failedAttempts, isActive: false },
+        });
+        throw new ApiException(
+          MessageCodes.ACCOUNT_DISABLED,
+          'Your account has been locked due to too many failed login attempts. Please contact admin to unlock',
+          401,
+          'Login failed',
+        );
+      } else {
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data: { failedLoginAttempts: failedAttempts },
+        });
+        throw new ApiException(
+          MessageCodes.INVALID_CREDENTIALS,
+          'Email or password is incorrect',
+          401,
+          'Login failed',
+        );
+      }
+    }
+
+    // Reset failedLoginAttempts on successful login
+    if (user.failedLoginAttempts && user.failedLoginAttempts > 0) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { failedLoginAttempts: 0 },
+      });
     }
 
     // Generate tokens
