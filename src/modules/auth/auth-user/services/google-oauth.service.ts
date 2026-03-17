@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OAuth2Client } from 'google-auth-library';
-import { ApiException } from '../../../common/exceptions/api.exception';
+import { ApiException } from 'src/common/exceptions/api.exception';
 
 export interface GoogleUserInfo {
   googleId: string;
@@ -37,9 +37,9 @@ export class GoogleOAuthService {
       if (!payload) {
         throw new ApiException(
           'AUTH.GOOGLE.INVALID_TOKEN',
-          'Google ID token không hợp lệ',
+          'Invalid Google ID token',
           401,
-          'Xác thực Google thất bại',
+          'Google authentication failed',
         );
       }
 
@@ -55,9 +55,9 @@ export class GoogleOAuthService {
         error instanceof Error ? error.message : 'Unknown error';
       throw new ApiException(
         'AUTH.GOOGLE.VERIFICATION_FAILED',
-        'Không thể xác thực Google ID token: ' + errorMessage,
+        'Unable to verify Google ID token: ',
         401,
-        'Xác thực Google thất bại',
+        'Google authentication failed',
       );
     }
   }
