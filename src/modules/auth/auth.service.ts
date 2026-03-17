@@ -12,7 +12,6 @@ import { ResendOtpDto } from './dto/resend-otp.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { GoogleOAuthDto } from './dto/google-oauth.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
-import { ResetPasswordDto } from './dto/reset-password.dto';
 import { Role, VerificationType } from '@prisma/client';
 import { ResponseHelper } from '../../common/interfaces/api-response.interface';
 import { MessageCodes } from '../../common/constants/message-codes.const';
@@ -178,10 +177,10 @@ export class AuthService {
 
 
   /**
-   * Verify email with OTP code (kept for backward compatibility)
+   * Verify account/email/password with OTP code
    */
-  async verifyEmail(verifyEmailDto: VerifyEmailDto) {
-    const { email, code } = verifyEmailDto;
+  async verifyOtp(verifyOtpDto: VerifyEmailDto) {
+    const { email, code, type } = verifyOtpDto;
 
     // Find user
     const user = await this.prisma.user.findUnique({
@@ -197,12 +196,18 @@ export class AuthService {
       );
     }
 
+    // Mapping external type to internal VerificationType
+    const verificationType =
+      type === 'forgotpassword'
+        ? VerificationType.PASSWORD_RESET
+        : VerificationType.EMAIL_VERIFICATION;
+
     // Find verification code
     const verificationCode = await this.prisma.verificationCode.findFirst({
       where: {
         userId: user.id,
         code,
-        type: VerificationType.EMAIL_VERIFICATION,
+        type: verificationType,
         isUsed: false,
       },
       orderBy: { createdAt: 'desc' },
@@ -227,40 +232,46 @@ export class AuthService {
       );
     }
 
-    // Mark code as used and verify email
-    await this.prisma.$transaction([
-      this.prisma.verificationCode.update({
-        where: { id: verificationCode.id },
-        data: { isUsed: true },
-      }),
-      this.prisma.user.update({
-        where: { id: user.id },
-        data: { emailVerified: true },
-      }),
-    ]);
+    if (type === 'account') {
+      await this.prisma.$transaction([
+        this.prisma.verificationCode.update({
+          where: { id: verificationCode.id },
+          data: { isUsed: true },
+        }),
+        this.prisma.user.update({
+          where: { id: user.id },
+          data: { emailVerified: true },
+        }),
+      ]);
 
-    // Send welcome email
-    if (user.email) {
-      await this.mailService.sendWelcomeEmail(user.email, user.fullName);
+      // Send welcome email
+      if (user.email) {
+        await this.mailService.sendWelcomeEmail(user.email, user.fullName);
+      }
+
+      // Generate tokens
+      const tokens = await this.generateTokenPair(user.id, user.email);
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { password: _password, ...userWithoutPassword } = user;
+
+      return ResponseHelper.success(
+        {
+          user: { ...userWithoutPassword, emailVerified: true },
+          ...tokens,
+        },
+        MessageCodes.VERIFY_SUCCESS,
+        'Email verified successfully!',
+        200,
+      );
     }
 
-    // Generate tokens
-    const tokens = await this.generateTokenPair(
-      user.id,
-      user.email,
-    );
-
-    // Remove password from response
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password: _password, ...userWithoutPassword } = user;
-
+    // For forgotpassword, we just return success so user can proceed to reset password form
+    // We don't mark it as used yet because resetPassword() needs to use it
     return ResponseHelper.success(
-      {
-        user: { ...userWithoutPassword, emailVerified: true },
-        ...tokens,
-      },
+      { email },
       MessageCodes.VERIFY_SUCCESS,
-      'Email verified successfully!',
+      'OTP verified successfully! You can now reset your password.',
       200,
     );
   }
@@ -269,7 +280,7 @@ export class AuthService {
    * Resend OTP code
    */
   async resendOtp(resendOtpDto: ResendOtpDto) {
-    const { email } = resendOtpDto;
+    const { email, type } = resendOtpDto;
 
     const user = await this.prisma.user.findUnique({
       where: { email },
@@ -284,7 +295,13 @@ export class AuthService {
       );
     }
 
-    if (user.emailVerified) {
+    // Mapping external type to internal VerificationType
+    const verificationType =
+      type === 'forgotpassword'
+        ? VerificationType.PASSWORD_RESET
+        : VerificationType.EMAIL_VERIFICATION;
+
+    if (type === 'account' && user.emailVerified) {
       throw new ApiException(
         'AUTH.VERIFY.ALREADY_VERIFIED',
         'Email already verified',
@@ -296,11 +313,19 @@ export class AuthService {
     // Generate new OTP code
     const otpCode = await this.createVerificationCode(
       user.id,
-      VerificationType.EMAIL_VERIFICATION,
+      verificationType,
     );
 
     // Send OTP via email
-    await this.mailService.sendOtpEmail(email, otpCode);
+    if (type === 'forgotpassword') {
+      await this.mailService.sendForgotPasswordEmail(
+        email,
+        user.fullName,
+        otpCode,
+      );
+    } else {
+      await this.mailService.sendOtpEmail(email, otpCode);
+    }
 
     return ResponseHelper.success(
       { email },
@@ -310,9 +335,6 @@ export class AuthService {
     );
   }
 
-  /**
-   * Login user
-   */
   /**
    * Login user with email
    */
@@ -385,7 +407,6 @@ export class AuthService {
     );
 
     // Remove password from response
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password: _password, ...userWithoutPassword } = user;
 
     return ResponseHelper.success(
@@ -460,7 +481,6 @@ export class AuthService {
     );
 
     // Remove password from response
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password: _password, ...userWithoutPassword } = user;
 
     return ResponseHelper.success(
@@ -552,7 +572,7 @@ export class AuthService {
   /**
    * Forgot password - send OTP email
    */
-  async forgotPassword(forgotPasswordDto: ForgotPasswordDto) {
+  async sendResetPassword(forgotPasswordDto: ForgotPasswordDto) {
     const { email } = forgotPasswordDto;
 
     // Find user
@@ -586,88 +606,6 @@ export class AuthService {
       { email },
       MessageCodes.FORGOT_PASSWORD_SUCCESS,
       'Otp reset password has been sent to email!',
-      200,
-    );
-  }
-
-  /**
-   * Reset password with OTP code
-   */
-  async resetPassword(resetPasswordDto: ResetPasswordDto) {
-    const { email, code, newPassword } = resetPasswordDto;
-
-    // Find user
-    const user = await this.prisma.user.findUnique({
-      where: { email },
-    });
-
-    if (!user) {
-      throw new ApiException(
-        MessageCodes.USER_NOT_FOUND,
-        'User not found',
-        404,
-        'Reset password failed',
-      );
-    }
-
-    // Find verification code
-    const verificationCode = await this.prisma.verificationCode.findFirst({
-      where: {
-        userId: user.id,
-        code,
-        type: VerificationType.PASSWORD_RESET,
-        isUsed: false,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    if (!verificationCode) {
-      throw new ApiException(
-        MessageCodes.INVALID_OTP,
-        'Invalid reset code',
-        400,
-        'Reset password failed',
-      );
-    }
-
-    // Check if code is expired
-    if (new Date() > verificationCode.expiresAt) {
-      throw new ApiException(
-        MessageCodes.OTP_EXPIRED,
-        'Reset code has expired',
-        400,
-        'Reset password failed',
-      );
-    }
-
-    // Hash new password
-    const hashedPassword = await this.hashPassword(newPassword);
-
-    // Update password and mark code as used
-    await this.prisma.$transaction([
-      this.prisma.verificationCode.update({
-        where: { id: verificationCode.id },
-        data: { isUsed: true },
-      }),
-      this.prisma.user.update({
-        where: { id: user.id },
-        data: {
-          password: hashedPassword,
-          // If user was using password reset, we can assume their email is verified
-          emailVerified: true,
-        },
-      }),
-      // Revoke all refresh tokens for security
-      this.prisma.refreshToken.updateMany({
-        where: { userId: user.id },
-        data: { isRevoked: true },
-      }),
-    ]);
-
-    return ResponseHelper.success(
-      null,
-      MessageCodes.RESET_PASSWORD_SUCCESS,
-      'Password has been reset successfully!',
       200,
     );
   }

@@ -53,7 +53,7 @@ export class AuthController {
   @Post('verify-email')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Verify email with OTP code',
+    summary: 'Verify account with OTP code',
   })
   @ApiResponse({
     status: 200,
@@ -64,7 +64,25 @@ export class AuthController {
     description: 'Invalid or expired OTP',
   })
   async verifyEmail(@Body() verifyEmailDto: VerifyEmailDto) {
-    return this.authService.verifyEmail(verifyEmailDto);
+    return this.authService.verifyOtp(verifyEmailDto);
+  }
+
+  @Public()
+  @Post('verify-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Verify password reset OTP code',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'OTP verified successfully',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid or expired OTP',
+  })
+  async verifyPassword(@Body() verifyEmailDto: VerifyEmailDto) {
+    return this.authService.verifyOtp(verifyEmailDto);
   }
 
   @Public()
@@ -158,7 +176,6 @@ export class AuthController {
   async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
     return this.authService.sendResetPassword(forgotPasswordDto);
   }
-
 
   @Get('profile')
   @UseGuards(JwtAuthGuard)
