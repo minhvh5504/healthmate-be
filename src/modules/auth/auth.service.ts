@@ -12,6 +12,7 @@ import { ResendOtpDto } from './dto/resend-otp.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { GoogleOAuthDto } from './dto/google-oauth.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { Role, VerificationType } from '@prisma/client';
 import { ResponseHelper } from '../../common/interfaces/api-response.interface';
 import { MessageCodes } from '../../common/constants/message-codes.const';
@@ -174,8 +175,6 @@ export class AuthService {
     );
   }
 
-
-
   /**
    * Verify account/email/password with OTP code
    */
@@ -192,6 +191,15 @@ export class AuthService {
         MessageCodes.USER_NOT_FOUND,
         'User not found',
         404,
+        'Verification failed',
+      );
+    }
+
+    if (!user.isActive) {
+      throw new ApiException(
+        MessageCodes.ACCOUNT_DISABLED,
+        'Your account has been deactivated/blocked by admin',
+        401,
         'Verification failed',
       );
     }
@@ -266,10 +274,23 @@ export class AuthService {
       );
     }
 
-    // For forgotpassword, we just return success so user can proceed to reset password form
-    // We don't mark it as used yet because resetPassword() needs to use it
+    // Mark OTP as used immediately
+    await this.prisma.verificationCode.update({
+      where: { id: verificationCode.id },
+      data: { isUsed: true },
+    });
+
+    // Generate a temporary reset token (expires in 15 minutes)
+    const resetToken = this.jwtService.sign(
+      { sub: user.id, email: user.email, type: 'RESET_PASSWORD' },
+      {
+        secret: this.configService.getOrThrow<string>('JWT_SECRET'),
+        expiresIn: '15m',
+      },
+    );
+
     return ResponseHelper.success(
-      { email },
+      { email, resetToken },
       MessageCodes.VERIFY_SUCCESS,
       'OTP verified successfully! You can now reset your password.',
       200,
@@ -589,6 +610,15 @@ export class AuthService {
       );
     }
 
+    if (!user.isActive) {
+      throw new ApiException(
+        MessageCodes.ACCOUNT_DISABLED,
+        'Your account has been deactivated/blocked by admin',
+        401,
+        'Forgot password failed',
+      );
+    }
+
     // Generate and store reset code
     const code = await this.createVerificationCode(
       user.id,
@@ -606,6 +636,84 @@ export class AuthService {
       { email },
       MessageCodes.FORGOT_PASSWORD_SUCCESS,
       'Otp reset password has been sent to email!',
+      200,
+    );
+  }
+
+  /**
+   * Reset password with temporary reset token
+   */
+  async resetPassword(resetPasswordDto: ResetPasswordDto) {
+    const { resetToken, newPassword } = resetPasswordDto;
+
+    let payload: any;
+    try {
+      // Verify the reset token
+      payload = this.jwtService.verify(resetToken, {
+        secret: this.configService.getOrThrow<string>('JWT_SECRET'),
+      });
+
+      // Check token type
+      if (payload.type !== 'RESET_PASSWORD') {
+        throw new Error('Invalid token type');
+      }
+    } catch (error) {
+      throw new ApiException(
+        MessageCodes.INVALID_TOKEN,
+        'Invalid or expired reset token',
+        400,
+        'Reset password failed',
+      );
+    }
+
+    const userId = payload.sub;
+
+    // Find user
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new ApiException(
+        MessageCodes.USER_NOT_FOUND,
+        'User not found',
+        404,
+        'Reset password failed',
+      );
+    }
+
+    if (!user.isActive) {
+      throw new ApiException(
+        MessageCodes.ACCOUNT_DISABLED,
+        'Your account has been deactivated/blocked by admin',
+        401,
+        'Reset password failed',
+      );
+    }
+
+    // Hash new password
+    const hashedPassword = await this.hashPassword(newPassword);
+
+    // Update password and revoke tokens
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          password: hashedPassword,
+          emailVerified: true,
+        },
+      }),
+      // Revoke all refresh tokens for security
+      this.prisma.refreshToken.updateMany({
+        where: { userId: user.id },
+        data: { isRevoked: true },
+      }),
+    ]);
+
+    return ResponseHelper.success(
+      null,
+      MessageCodes.RESET_PASSWORD_SUCCESS,
+      'Password has been reset successfully!',
       200,
     );
   }
