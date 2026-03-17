@@ -3,7 +3,7 @@ import { IsEmail, IsOptional, IsString, Length } from 'class-validator';
 
 export class VerifyEmailDto {
   @ApiProperty({
-    example: 'patient@healthmate.com',
+    example: 'user@example.com',
     description: 'User email address',
   })
   @IsEmail({}, { message: 'Invalid email format' })
@@ -18,11 +18,10 @@ export class VerifyEmailDto {
   code: string;
 
   @ApiProperty({
-    example: '0901234567',
-    description: 'Optional phone number',
-    required: false,
+    example: 'account',
+    description: 'Type of verification (account or forgotpassword)',
+    enum: ['account', 'forgotpassword'],
   })
-  @IsOptional()
-  @IsString()
-  phone?: string;
+  @IsString({ message: 'Type must be account or forgotpassword' })
+  type: 'account' | 'forgotpassword';
 }

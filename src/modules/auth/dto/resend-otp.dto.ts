@@ -10,11 +10,10 @@ export class ResendOtpDto {
   email: string;
 
   @ApiProperty({
-    example: '0901234567',
-    description: 'Optional phone number',
-    required: false,
+    example: 'account',
+    description: 'Type of verification (account or forgotpassword)',
+    enum: ['account', 'forgotpassword'],
   })
-  @IsOptional()
-  @IsString()
-  phone?: string;
+  @IsString({ message: 'Type must be account or forgotpassword' })
+  type: 'account' | 'forgotpassword';
 }
