@@ -282,7 +282,12 @@ export class AuthService {
 
     // Generate a temporary reset token (expires in 15 minutes)
     const resetToken = this.jwtService.sign(
-      { sub: user.id, email: user.email, type: 'RESET_PASSWORD' },
+      {
+        sub: user.id,
+        email: user.email,
+        type: 'RESET_PASSWORD',
+        p: user.password
+      },
       {
         secret: this.configService.getOrThrow<string>('JWT_SECRET'),
         expiresIn: '15m',
@@ -378,6 +383,14 @@ export class AuthService {
 
     // Check if account is active (not blocked by admin)
     if (!user.isActive) {
+      if (user.failedLoginAttempts && user.failedLoginAttempts >= 5) {
+        throw new ApiException(
+          MessageCodes.ACCOUNT_DISABLED,
+          'Your account has been locked due to too many failed login attempts. Please contact admin to unlock',
+          401,
+          'Login failed',
+        );
+      }
       throw new ApiException(
         MessageCodes.ACCOUNT_DISABLED,
         'Your account has been deactivated/blocked by admin',
@@ -413,12 +426,39 @@ export class AuthService {
     );
 
     if (!isPasswordValid) {
-      throw new ApiException(
-        MessageCodes.INVALID_CREDENTIALS,
-        'Phone number/email or password is incorrect',
-        401,
-        'Login failed',
-      );
+      const failedAttempts = (user.failedLoginAttempts || 0) + 1;
+
+      if (failedAttempts >= 5) {
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data: { failedLoginAttempts: failedAttempts, isActive: false },
+        });
+        throw new ApiException(
+          MessageCodes.ACCOUNT_DISABLED,
+          'Your account has been locked due to too many failed login attempts. Please contact admin to unlock',
+          401,
+          'Login failed',
+        );
+      } else {
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data: { failedLoginAttempts: failedAttempts },
+        });
+        throw new ApiException(
+          MessageCodes.INVALID_CREDENTIALS,
+          'Phone number/email or password is incorrect',
+          401,
+          'Login failed',
+        );
+      }
+    }
+
+    // Reset failedLoginAttempts on successful login
+    if (user.failedLoginAttempts && user.failedLoginAttempts > 0) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { failedLoginAttempts: 0 },
+      });
     }
 
     // Generate tokens
@@ -691,6 +731,19 @@ export class AuthService {
       );
     }
 
+    const oldPasswordHash = payload.p;
+    if (oldPasswordHash) {
+      const isSamePassword = await this.comparePasswords(newPassword, oldPasswordHash);
+      if (isSamePassword) {
+        throw new ApiException(
+          MessageCodes.SAME_PASSWORD,
+          'New password cannot be the same as the old password. Please choose a different password.',
+          400,
+          'Reset password failed',
+        );
+      }
+    }
+
     // Hash new password
     const hashedPassword = await this.hashPassword(newPassword);
 
@@ -701,6 +754,7 @@ export class AuthService {
         data: {
           password: hashedPassword,
           emailVerified: true,
+          failedLoginAttempts: 0,
         },
       }),
       // Revoke all refresh tokens for security
