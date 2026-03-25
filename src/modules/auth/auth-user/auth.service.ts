@@ -475,7 +475,7 @@ export class AuthService {
       user = await this.prisma.user.create({
         data: {
           email: googleUser.email,
-          fullName: googleUser.name,
+          fullName: this.generateDefaultFullName(),
           googleId: googleUser.googleId,
           picture: googleUser.picture,
           emailVerified: true,
@@ -747,6 +747,12 @@ export class AuthService {
         fullName: true,
         role: true,
         avatar: true,
+        dateOfBirth: true,
+        gender: true,
+        address: true,
+        emailVerified: true,
+        googleId: true,
+        picture: true,
         isActive: true,
         createdAt: true,
         updatedAt: true,
