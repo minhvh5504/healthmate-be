@@ -1,6 +1,5 @@
 generator client {
   provider        = "prisma-client-js"
-  output          = "../node_modules/.prisma/client"
   previewFeatures = ["driverAdapters"]
 }
 
@@ -9,23 +8,20 @@ datasource db {
 }
 
 model User {
-  id                String             @id @default(uuid())
-  email             String?            @unique
-  password          String?
-  role              Role               @default(USER)
-  fullName          String
-  avatar            String?
-  dateOfBirth       DateTime?          @db.Date
-  gender            Gender?
-  address           String?
-  emailVerified     Boolean            @default(false)
-  googleId          String?            @unique
-  picture           String?
-  isActive          Boolean            @default(true)
-  failedLoginAttempts Int              @default(0)
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  deletedAt         DateTime?
+  id                  String             @id @default(uuid())
+  email               String             @unique @db.VarChar(255)
+  password            String?            @db.VarChar(255)
+  role                Role               @default(user)
+  emailVerified       Boolean            @default(false) @map("email_verified")
+  googleId            String?            @unique @map("google_id") @db.VarChar(255)
+  avatarUrl           String?            @map("avatar_url") @db.VarChar(500)
+  failedLoginAttempts Int                @default(0) @map("failed_login_attempts")
+  lockedUntil         DateTime?          @map("locked_until")
+  isActive            Boolean            @default(true) @map("is_active")
+  createdAt           DateTime           @default(now()) @map("created_at")
+  updatedAt           DateTime           @updatedAt @map("updated_at")
+
+  profile           UserProfile?
   refreshTokens     RefreshToken[]
   verificationCodes VerificationCode[]
 
@@ -35,13 +31,30 @@ model User {
   @@map("users")
 }
 
+model UserProfile {
+  id          String    @id @default(uuid())
+  userId      String    @unique @map("user_id")
+  fullName    String?   @map("full_name") @db.VarChar(255)
+  dateOfBirth DateTime? @map("date_of_birth") @db.Date
+  gender      Gender?
+  heightCm    Decimal?  @map("height_cm") @db.Decimal(5, 2)
+  weightKg    Decimal?  @map("weight_kg") @db.Decimal(5, 2)
+  allergies   String?   @db.Text
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("user_profiles")
+}
+
 model RefreshToken {
   id        String   @id @default(uuid())
-  userId    String
+  userId    String   @map("user_id")
   token     String   @unique
-  expiresAt DateTime
-  isRevoked Boolean  @default(false)
-  createdAt DateTime @default(now())
+  expiresAt DateTime @map("expires_at")
+  isRevoked Boolean  @default(false) @map("is_revoked")
+  createdAt DateTime @default(now()) @map("created_at")
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
@@ -51,12 +64,12 @@ model RefreshToken {
 
 model VerificationCode {
   id        String           @id @default(uuid())
-  userId    String
+  userId    String           @map("user_id")
   code      String
-  type      VerificationType
-  expiresAt DateTime
-  isUsed    Boolean          @default(false)
-  createdAt DateTime         @default(now())
+  type      VerificationType @map("type")
+  expiresAt DateTime         @map("expires_at")
+  isUsed    Boolean          @default(false) @map("is_used")
+  createdAt DateTime         @default(now()) @map("created_at")
   user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, type, isUsed])
@@ -65,14 +78,14 @@ model VerificationCode {
 }
 
 enum Role {
-  ADMIN
-  USER
+  admin
+  user
 }
 
 enum Gender {
-  MALE
-  FEMALE
-  OTHER
+  male
+  female
+  other
 }
 
 enum VerificationType {

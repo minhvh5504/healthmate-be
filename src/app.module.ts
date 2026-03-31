@@ -1,4 +1,5 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
@@ -8,6 +9,7 @@ import { AuthAdminModule } from './modules/auth/auth-admin/auth.module';
 import { RealtimeModule } from './modules/realtime/realtime.module';
 import { UploadModule } from './modules/upload/upload.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
+import { CleanupService } from './common/services/cleanup.service';
 
 @Module({
   imports: [
@@ -16,6 +18,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
       isGlobal: true,
       envFilePath: '.env',
     }),
+    ScheduleModule.forRoot(),
 
     // Throttler for rate limiting
     ThrottlerModule.forRoot([
@@ -45,6 +48,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
     },
+    CleanupService,
   ],
 })
 export class AppModule implements NestModule {

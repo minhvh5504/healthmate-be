@@ -140,15 +140,22 @@ export class AuthAdminService {
     // Hash password
     const hashedPassword = await this.hashPassword(password);
 
-    // Create user with emailVerified = false and Role.ADMIN
+    // Create user with emailVerified = false and Role.admin
     const user = await this.prisma.user.create({
       data: {
         email,
         password: hashedPassword,
-        fullName: this.generateDefaultFullName(),
-        role: Role.ADMIN,
+        profile: {
+          create: {
+            fullName: this.generateDefaultFullName(),
+          },
+        },
+        role: Role.admin,
         emailVerified: false,
         isActive: true,
+      },
+      include: {
+        profile: true,
       },
     });
 
@@ -178,6 +185,7 @@ export class AuthAdminService {
     // Find user
     const user = await this.prisma.user.findUnique({
       where: { email },
+      include: { profile: true },
     });
 
     if (!user) {
@@ -192,7 +200,7 @@ export class AuthAdminService {
     if (!user.isActive) {
       throw new ApiException(
         MessageCodes.ACCOUNT_DISABLED,
-        'Your account has been deactivated/blocked by admin',
+        'Your account has been deactivated/blocked. Please contact admin to unlock your account.',
         401,
         'Verification failed',
       );
@@ -232,9 +240,8 @@ export class AuthAdminService {
     }
 
     await this.prisma.$transaction([
-      this.prisma.verificationCode.update({
+      this.prisma.verificationCode.delete({
         where: { id: verificationCode.id },
-        data: { isUsed: true },
       }),
       this.prisma.user.update({
         where: { id: user.id },
@@ -244,7 +251,7 @@ export class AuthAdminService {
 
     // Send welcome email
     if (user.email) {
-      await this.mailService.sendWelcomeEmail(user.email, user.fullName);
+      await this.mailService.sendWelcomeEmail(user.email, user.profile?.fullName ?? '');
     }
 
     // Generate tokens
@@ -270,6 +277,7 @@ export class AuthAdminService {
     const { email } = resendOtpDto;
 
     const user = await this.prisma.user.findUnique({
+      include: { profile: true },
       where: { email },
     });
 
@@ -317,6 +325,7 @@ export class AuthAdminService {
     // Find user by email and check if it's an admin
     const user = await this.prisma.user.findFirst({
       where: { email },
+      include: { profile: true },
     });
 
     if (!user) {
@@ -329,29 +338,11 @@ export class AuthAdminService {
     }
 
     // Check if user is an admin
-    if (user.role !== Role.ADMIN) {
+    if (user.role !== Role.admin) {
       throw new ApiException(
         MessageCodes.INSUFFICIENT_PERMISSIONS,
         'You do not have permission to access the admin portal',
         403,
-        'Login failed',
-      );
-    }
-
-    // Check if account is active
-    if (!user.isActive) {
-      if (user.failedLoginAttempts && user.failedLoginAttempts >= 5) {
-        throw new ApiException(
-          MessageCodes.ACCOUNT_DISABLED,
-          'Your account has been locked due to too many failed login attempts. Please contact admin to unlock',
-          401,
-          'Login failed',
-        );
-      }
-      throw new ApiException(
-        MessageCodes.ACCOUNT_DISABLED,
-        'Your account has been deactivated/blocked by admin',
-        401,
         'Login failed',
       );
     }
@@ -373,39 +364,12 @@ export class AuthAdminService {
     );
 
     if (!isPasswordValid) {
-      const failedAttempts = (user.failedLoginAttempts || 0) + 1;
-      
-      if (failedAttempts >= 5) {
-        await this.prisma.user.update({
-          where: { id: user.id },
-          data: { failedLoginAttempts: failedAttempts, isActive: false },
-        });
-        throw new ApiException(
-          MessageCodes.ACCOUNT_DISABLED,
-          'Your account has been locked due to too many failed login attempts. Please contact admin to unlock',
-          401,
-          'Login failed',
-        );
-      } else {
-        await this.prisma.user.update({
-          where: { id: user.id },
-          data: { failedLoginAttempts: failedAttempts },
-        });
-        throw new ApiException(
-          MessageCodes.INVALID_CREDENTIALS,
-          'Email or password is incorrect',
-          401,
-          'Login failed',
-        );
-      }
-    }
-
-    // Reset failedLoginAttempts on successful login
-    if (user.failedLoginAttempts && user.failedLoginAttempts > 0) {
-      await this.prisma.user.update({
-        where: { id: user.id },
-        data: { failedLoginAttempts: 0 },
-      });
+      throw new ApiException(
+        MessageCodes.INVALID_CREDENTIALS,
+        'Email or password is incorrect',
+        401,
+        'Login failed',
+      );
     }
 
     // Generate tokens
@@ -457,7 +421,7 @@ export class AuthAdminService {
       }
 
       // Check if user is an admin
-      if (storedToken.user.role !== Role.ADMIN) {
+      if (storedToken.user.role !== Role.admin) {
         throw new ApiException(
           MessageCodes.INSUFFICIENT_PERMISSIONS,
           'Invalid permissions',
@@ -538,9 +502,10 @@ export class AuthAdminService {
   async validateAdmin(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
+      include: { profile: true },
     });
 
-    if (!user || user.role !== Role.ADMIN || !user.isActive) {
+    if (!user || user.role !== Role.admin || !user.isActive) {
       throw new UnauthorizedException('Unauthorized access to admin resource');
     }
 
