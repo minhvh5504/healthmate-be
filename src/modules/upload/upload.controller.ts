@@ -30,7 +30,7 @@ export class UploadController {
   constructor(private readonly uploadService: UploadService) { }
 
   @Post('icon')
-  @Roles(Role.ADMIN)
+  @Roles(Role.admin)
   @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({
     summary: 'Upload service icon (ADMIN only)',

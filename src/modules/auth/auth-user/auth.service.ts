@@ -151,10 +151,17 @@ export class AuthService {
       data: {
         email,
         password: hashedPassword,
-        fullName: this.generateDefaultFullName(),
-        role: Role.USER,
+        profile: {
+          create: {
+            fullName: this.generateDefaultFullName(),
+          },
+        },
+        role: Role.user,
         emailVerified: false,
         isActive: true,
+      },
+      include: {
+        profile: true,
       },
     });
 
@@ -184,6 +191,7 @@ export class AuthService {
     // Find user
     const user = await this.prisma.user.findUnique({
       where: { email },
+      include: { profile: true },
     });
 
     if (!user) {
@@ -198,7 +206,7 @@ export class AuthService {
     if (!user.isActive) {
       throw new ApiException(
         MessageCodes.ACCOUNT_DISABLED,
-        'Your account has been deactivated/blocked by admin',
+        'Your account has been deactivated/blocked. Please contact admin to unlock your account.',
         401,
         'Verification failed',
       );
@@ -242,9 +250,8 @@ export class AuthService {
 
     if (type === 'account') {
       await this.prisma.$transaction([
-        this.prisma.verificationCode.update({
+        this.prisma.verificationCode.delete({
           where: { id: verificationCode.id },
-          data: { isUsed: true },
         }),
         this.prisma.user.update({
           where: { id: user.id },
@@ -254,7 +261,7 @@ export class AuthService {
 
       // Send welcome email
       if (user.email) {
-        await this.mailService.sendWelcomeEmail(user.email, user.fullName);
+        await this.mailService.sendWelcomeEmail(user.email, user.profile?.fullName ?? '');
       }
 
       // Generate tokens
@@ -274,10 +281,9 @@ export class AuthService {
       );
     }
 
-    // Mark OTP as used immediately
-    await this.prisma.verificationCode.update({
+    // Delete OTP immediately after use
+    await this.prisma.verificationCode.delete({
       where: { id: verificationCode.id },
-      data: { isUsed: true },
     });
 
     // Generate a temporary reset token (expires in 15 minutes)
@@ -310,6 +316,7 @@ export class AuthService {
 
     const user = await this.prisma.user.findUnique({
       where: { email },
+      include: { profile: true },
     });
 
     if (!user) {
@@ -346,7 +353,7 @@ export class AuthService {
     if (type === 'forgotpassword') {
       await this.mailService.sendForgotPasswordEmail(
         email,
-        user.fullName,
+        user.profile?.fullName ?? '',
         otpCode,
       );
     } else {
@@ -370,6 +377,7 @@ export class AuthService {
     // Find user by email
     const user = await this.prisma.user.findFirst({
       where: { email },
+      include: { profile: true },
     });
 
     if (!user) {
@@ -381,19 +389,24 @@ export class AuthService {
       );
     }
 
-    // Check if account is active (not blocked by admin)
+    // 1. Check if account is active (blocked by admin or permanent lockout)
     if (!user.isActive) {
-      if (user.failedLoginAttempts && user.failedLoginAttempts >= 5) {
-        throw new ApiException(
-          MessageCodes.ACCOUNT_DISABLED,
-          'Your account has been locked due to too many failed login attempts. Please contact admin to unlock',
-          401,
-          'Login failed',
-        );
-      }
       throw new ApiException(
         MessageCodes.ACCOUNT_DISABLED,
-        'Your account has been deactivated/blocked by admin',
+        'Your account has been deactivated/blocked. Please contact admin to unlock your account.',
+        401,
+        'Login failed',
+      );
+    }
+
+    // 2. Check if account is locked (temporary lockout)
+    if (user.lockedUntil && user.lockedUntil > new Date()) {
+      const remainingMinutes = Math.ceil(
+        (user.lockedUntil.getTime() - Date.now()) / (1000 * 60),
+      );
+      throw new ApiException(
+        MessageCodes.ACCOUNT_LOCKED,
+        `Your account has been locked for 30 minutes due to 5 failed login attempts. Please wait ${remainingMinutes} more minutes.`,
         401,
         'Login failed',
       );
@@ -420,22 +433,24 @@ export class AuthService {
     }
 
     // Verify password
-    const isPasswordValid = await this.comparePasswords(
-      password,
-      user.password,
-    );
+    const isPasswordValid = await this.comparePasswords(password, user.password);
 
     if (!isPasswordValid) {
       const failedAttempts = (user.failedLoginAttempts || 0) + 1;
 
       if (failedAttempts >= 5) {
+        // Set temporary lockout for 30 minutes
+        const lockedUntil = new Date(Date.now() + 30 * 60 * 1000);
         await this.prisma.user.update({
           where: { id: user.id },
-          data: { failedLoginAttempts: failedAttempts, isActive: false },
+          data: {
+            failedLoginAttempts: 0,
+            lockedUntil,
+          },
         });
         throw new ApiException(
-          MessageCodes.ACCOUNT_DISABLED,
-          'Your account has been locked due to too many failed login attempts. Please contact admin to unlock',
+          MessageCodes.ACCOUNT_LOCKED,
+          'Your account has been locked for 30 minutes due to 5 failed login attempts.',
           401,
           'Login failed',
         );
@@ -446,18 +461,18 @@ export class AuthService {
         });
         throw new ApiException(
           MessageCodes.INVALID_CREDENTIALS,
-          'Phone number/email or password is incorrect',
+          'Email or password is incorrect',
           401,
           'Login failed',
         );
       }
     }
 
-    // Reset failedLoginAttempts on successful login
-    if (user.failedLoginAttempts && user.failedLoginAttempts > 0) {
+    // Reset failedLoginAttempts and lockedUntil on successful login
+    if ((user.failedLoginAttempts || 0) > 0 || user.lockedUntil) {
       await this.prisma.user.update({
         where: { id: user.id },
-        data: { failedLoginAttempts: 0 },
+        data: { failedLoginAttempts: 0, lockedUntil: null },
       });
     }
 
@@ -495,6 +510,7 @@ export class AuthService {
       where: {
         OR: [{ googleId: googleUser.googleId }, { email: googleUser.email }],
       },
+      include: { profile: true },
     });
 
     if (user) {
@@ -506,8 +522,9 @@ export class AuthService {
           data: {
             googleId: googleUser.googleId,
             emailVerified: true,
-            picture: googleUser.picture,
+            avatarUrl: googleUser.picture,
           },
+          include: { profile: true },
         });
       }
     } else {
@@ -515,21 +532,26 @@ export class AuthService {
       user = await this.prisma.user.create({
         data: {
           email: googleUser.email,
-          fullName: this.generateDefaultFullName(),
+          profile: {
+            create: {
+              fullName: googleUser.name || this.generateDefaultFullName(),
+            },
+          },
           googleId: googleUser.googleId,
-          picture: googleUser.picture,
+          avatarUrl: googleUser.picture,
           emailVerified: true,
-          role: Role.USER,
+          role: Role.user,
           isActive: true,
         },
+        include: { profile: true },
       });
     }
 
-    // Check if account is active (not blocked by admin)
+    // Check if account is active (blocked by admin or permanent lockout)
     if (!user.isActive) {
       throw new ApiException(
         MessageCodes.ACCOUNT_DISABLED,
-        'Your account has been deactivated/blocked by admin',
+        'Your account has been deactivated/blocked. Please contact admin to unlock your account.',
         401,
         'Login failed',
       );
@@ -639,6 +661,7 @@ export class AuthService {
     // Find user
     const user = await this.prisma.user.findUnique({
       where: { email },
+      include: { profile: true },
     });
 
     if (!user) {
@@ -653,7 +676,7 @@ export class AuthService {
     if (!user.isActive) {
       throw new ApiException(
         MessageCodes.ACCOUNT_DISABLED,
-        'Your account has been deactivated/blocked by admin',
+        'Your account has been deactivated/blocked. Please contact admin to unlock your account.',
         401,
         'Forgot password failed',
       );
@@ -668,7 +691,7 @@ export class AuthService {
     // Send email
     await this.mailService.sendForgotPasswordEmail(
       email,
-      user.fullName,
+      user.profile?.fullName ?? '',
       code,
     );
 
@@ -711,6 +734,7 @@ export class AuthService {
     // Find user
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
+      include: { profile: true },
     });
 
     if (!user) {
@@ -725,7 +749,7 @@ export class AuthService {
     if (!user.isActive) {
       throw new ApiException(
         MessageCodes.ACCOUNT_DISABLED,
-        'Your account has been deactivated/blocked by admin',
+        'Your account has been deactivated/blocked. Please contact admin to unlock your account.',
         401,
         'Reset password failed',
       );
@@ -798,18 +822,23 @@ export class AuthService {
       select: {
         id: true,
         email: true,
-        fullName: true,
         role: true,
-        avatar: true,
-        dateOfBirth: true,
-        gender: true,
-        address: true,
         emailVerified: true,
         googleId: true,
-        picture: true,
+        avatarUrl: true,
         isActive: true,
         createdAt: true,
         updatedAt: true,
+        profile: {
+          select: {
+            fullName: true,
+            dateOfBirth: true,
+            gender: true,
+            heightCm: true,
+            weightKg: true,
+            allergies: true,
+          }
+        },
       },
     });
 
