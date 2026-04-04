@@ -13,6 +13,7 @@ import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { GoogleOAuthDto } from './dto/google-oauth.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { Role, VerificationType } from '@prisma/client';
 import { ResponseHelper } from '../../../common/interfaces/api-response.interface';
 import { MessageCodes } from '../../../common/constants/message-codes.const';
@@ -851,6 +852,77 @@ export class AuthService {
     }
 
     return user;
+  }
+
+  /**
+   * Change password for authenticated user
+   */
+  async changePassword(userId: string, changePasswordDto: ChangePasswordDto) {
+    const { currentPassword, newPassword } = changePasswordDto;
+
+    // Find user
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new ApiException(
+        MessageCodes.USER_NOT_FOUND,
+        'User not found',
+        404,
+        'Change password failed',
+      );
+    }
+
+    // OAuth users don't have a password
+    if (!user.password) {
+      throw new ApiException(
+        MessageCodes.OAUTH_NO_PASSWORD,
+        'This account was registered via OAuth and does not have a password. Please use Google to sign in.',
+        400,
+        'Change password failed',
+      );
+    }
+
+    // Verify current password
+    const isCurrentPasswordValid = await this.comparePasswords(
+      currentPassword,
+      user.password,
+    );
+
+    if (!isCurrentPasswordValid) {
+      throw new ApiException(
+        MessageCodes.WRONG_CURRENT_PASSWORD,
+        'Current password is incorrect',
+        400,
+        'Change password failed',
+      );
+    }
+
+    // New password must differ from current password
+    const isSamePassword = await this.comparePasswords(newPassword, user.password);
+    if (isSamePassword) {
+      throw new ApiException(
+        MessageCodes.SAME_PASSWORD,
+        'New password cannot be the same as the current password. Please choose a different password.',
+        400,
+        'Change password failed',
+      );
+    }
+
+    // Hash and save new password
+    const hashedPassword = await this.hashPassword(newPassword);
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { password: hashedPassword },
+    });
+
+    return ResponseHelper.success(
+      null,
+      MessageCodes.CHANGE_PASSWORD_SUCCESS,
+      'Password changed successfully!',
+      200,
+    );
   }
 
   /**
