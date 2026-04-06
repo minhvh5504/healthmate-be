@@ -8,6 +8,7 @@ import { AuthModule } from './modules/auth/auth-user/auth.module';
 import { AuthAdminModule } from './modules/auth/auth-admin/auth.module';
 import { RealtimeModule } from './modules/realtime/realtime.module';
 import { UploadModule } from './modules/upload/upload.module';
+import { NotificationTimeSlotsModule } from './modules/notification-time-slots/notification-time-slots.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { CleanupService } from './common/services/cleanup.service';
 
@@ -36,6 +37,7 @@ import { CleanupService } from './common/services/cleanup.service';
     AuthAdminModule,
     UploadModule,
     RealtimeModule,
+    NotificationTimeSlotsModule,
   ],
   providers: [
     // Global guard - apply JWT auth to all routes by default
