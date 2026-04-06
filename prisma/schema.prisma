@@ -31,6 +31,15 @@ model User {
   @@map("users")
 }
 
+model NotificationTimeSlot {
+  id          String   @id @default(uuid())
+  slug        String   @unique @db.VarChar(30)
+  displayName String   @map("display_name") @db.VarChar(50)
+  defaultTime String   @map("default_time") @db.VarChar(5)
+
+  @@map("notification_time_slots")
+}
+
 model UserProfile {
   id          String    @id @default(uuid())
   userId      String    @unique @map("user_id")
