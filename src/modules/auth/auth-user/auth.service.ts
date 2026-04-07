@@ -7,7 +7,6 @@ import { MailService } from '../../notifications/mail.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
-import { VerifyPhoneDto } from './dto/verify-phone.dto';
 import { ResendOtpDto } from './dto/resend-otp.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { GoogleOAuthDto } from './dto/google-oauth.dto';
@@ -41,7 +40,7 @@ export class AuthService {
     private readonly mailService: MailService,
     private readonly smsService: MockSmsService,
     private readonly googleOAuthService: GoogleOAuthService,
-  ) { }
+  ) {}
 
   /**
    * Generate 6-digit OTP code
@@ -53,10 +52,7 @@ export class AuthService {
   /**
    * Create verification code record
    */
-  private async createVerificationCode(
-    userId: string,
-    type: VerificationType,
-  ): Promise<string> {
+  private async createVerificationCode(userId: string, type: VerificationType): Promise<string> {
     const code = this.generateOtpCode();
     const expiresAt = new Date();
     expiresAt.setMinutes(expiresAt.getMinutes() + 5); // Expires in 5 minutes
@@ -76,28 +72,19 @@ export class AuthService {
   /**
    * Generate access and refresh tokens
    */
-  private async generateTokenPair(
-    userId: string,
-    email: string | null,
-  ): Promise<TokenPair> {
+  private async generateTokenPair(userId: string, email: string | null): Promise<TokenPair> {
     const payload: JwtPayload = { sub: userId, email };
 
     // Generate access token
     const accessToken = this.jwtService.sign(payload, {
       secret: this.configService.getOrThrow<string>('JWT_SECRET'),
-      expiresIn: this.configService.get<string>(
-        'JWT_EXPIRES_IN',
-        '7d',
-      ) as StringValue,
+      expiresIn: this.configService.get<string>('JWT_EXPIRES_IN', '7d') as StringValue,
     });
 
     // Generate refresh token
     const refreshToken = this.jwtService.sign(payload, {
       secret: this.configService.getOrThrow<string>('JWT_REFRESH_SECRET'),
-      expiresIn: this.configService.get<string>(
-        'JWT_REFRESH_EXPIRES_IN',
-        '30d',
-      ) as StringValue,
+      expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRES_IN', '30d') as StringValue,
     });
 
     // Calculate expiration date for refresh token (30 days)
@@ -167,10 +154,7 @@ export class AuthService {
     });
 
     // Generate OTP code
-    const otpCode = await this.createVerificationCode(
-      user.id,
-      VerificationType.EMAIL_VERIFICATION,
-    );
+    const otpCode = await this.createVerificationCode(user.id, VerificationType.EMAIL_VERIFICATION);
 
     // Send OTP via email
     await this.mailService.sendOtpEmail(email, otpCode);
@@ -293,7 +277,7 @@ export class AuthService {
         sub: user.id,
         email: user.email,
         type: 'RESET_PASSWORD',
-        p: user.password
+        p: user.password,
       },
       {
         secret: this.configService.getOrThrow<string>('JWT_SECRET'),
@@ -345,18 +329,11 @@ export class AuthService {
     }
 
     // Generate new OTP code
-    const otpCode = await this.createVerificationCode(
-      user.id,
-      verificationType,
-    );
+    const otpCode = await this.createVerificationCode(user.id, verificationType);
 
     // Send OTP via email
     if (type === 'forgotpassword') {
-      await this.mailService.sendForgotPasswordEmail(
-        email,
-        user.profile?.fullName ?? '',
-        otpCode,
-      );
+      await this.mailService.sendForgotPasswordEmail(email, user.profile?.fullName ?? '', otpCode);
     } else {
       await this.mailService.sendOtpEmail(email, otpCode);
     }
@@ -402,9 +379,7 @@ export class AuthService {
 
     // 2. Check if account is locked (temporary lockout)
     if (user.lockedUntil && user.lockedUntil > new Date()) {
-      const remainingMinutes = Math.ceil(
-        (user.lockedUntil.getTime() - Date.now()) / (1000 * 60),
-      );
+      const remainingMinutes = Math.ceil((user.lockedUntil.getTime() - Date.now()) / (1000 * 60));
       throw new ApiException(
         MessageCodes.ACCOUNT_LOCKED,
         `Your account has been locked for 30 minutes due to 5 failed login attempts. Please wait ${remainingMinutes} more minutes.`,
@@ -478,10 +453,7 @@ export class AuthService {
     }
 
     // Generate tokens
-    const tokens = await this.generateTokenPair(
-      user.id,
-      user.email,
-    );
+    const tokens = await this.generateTokenPair(user.id, user.email);
 
     // Remove password from response
     const { password: _password, ...userWithoutPassword } = user;
@@ -559,10 +531,7 @@ export class AuthService {
     }
 
     // Generate tokens
-    const tokens = await this.generateTokenPair(
-      user.id,
-      user.email,
-    );
+    const tokens = await this.generateTokenPair(user.id, user.email);
 
     // Remove password from response
     const { password: _password, ...userWithoutPassword } = user;
@@ -626,10 +595,7 @@ export class AuthService {
       }
 
       // Generate new token pair
-      const tokens = await this.generateTokenPair(
-        payload.sub,
-        payload.email,
-      );
+      const tokens = await this.generateTokenPair(payload.sub, payload.email);
 
       // Revoke old refresh token
       await this.prisma.refreshToken.update({
@@ -684,17 +650,10 @@ export class AuthService {
     }
 
     // Generate and store reset code
-    const code = await this.createVerificationCode(
-      user.id,
-      VerificationType.PASSWORD_RESET,
-    );
+    const code = await this.createVerificationCode(user.id, VerificationType.PASSWORD_RESET);
 
     // Send email
-    await this.mailService.sendForgotPasswordEmail(
-      email,
-      user.profile?.fullName ?? '',
-      code,
-    );
+    await this.mailService.sendForgotPasswordEmail(email, user.profile?.fullName ?? '', code);
 
     return ResponseHelper.success(
       { email },
@@ -838,7 +797,7 @@ export class AuthService {
             heightCm: true,
             weightKg: true,
             allergies: true,
-          }
+          },
         },
       },
     });
@@ -885,10 +844,7 @@ export class AuthService {
     }
 
     // Verify current password
-    const isCurrentPasswordValid = await this.comparePasswords(
-      currentPassword,
-      user.password,
-    );
+    const isCurrentPasswordValid = await this.comparePasswords(currentPassword, user.password);
 
     if (!isCurrentPasswordValid) {
       throw new ApiException(
@@ -926,20 +882,6 @@ export class AuthService {
   }
 
   /**
-   * Get current user profile
-   */
-  async getProfile(userId: string) {
-    const user = await this.validateUser(userId);
-
-    return ResponseHelper.success(
-      user,
-      MessageCodes.PROFILE_RETRIEVED,
-      'Profile retrieved successfully',
-      200,
-    );
-  }
-
-  /**
    * Hash password
    */
   private async hashPassword(password: string): Promise<string> {
@@ -950,10 +892,7 @@ export class AuthService {
   /**
    * Compare passwords
    */
-  private async comparePasswords(
-    plainPassword: string,
-    hashedPassword: string,
-  ): Promise<boolean> {
+  private async comparePasswords(plainPassword: string, hashedPassword: string): Promise<boolean> {
     return bcrypt.compare(plainPassword, hashedPassword);
   }
 }

@@ -4,11 +4,13 @@ import {
   Body,
   HttpCode,
   HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
+  ApiBearerAuth,
 } from '@nestjs/swagger';
 import { AuthAdminService } from './auth.service';
 import { AdminLoginDto } from './dto/login.dto';
@@ -16,6 +18,7 @@ import { AdminRegisterDto } from './dto/register.dto';
 import { AdminRefreshTokenDto } from './dto/refresh-token.dto';
 import { AdminVerifyEmailDto } from './dto/verify-email.dto';
 import { AdminResendOtpDto } from './dto/resend-otp.dto';
+import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { Public } from '../../../common/decorators/public.decorator';
 
 @ApiTags('Admin Auth')
@@ -111,7 +114,8 @@ export class AuthAdminController {
     return this.authAdminService.refreshToken(refreshTokenDto);
   }
 
-  @Public()
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: '[Admin] Logout revoke refresh token' })
