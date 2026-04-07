@@ -1,18 +1,5 @@
-import {
-  Controller,
-  Post,
-  Body,
-  HttpCode,
-  HttpStatus,
-  Get,
-  UseGuards,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-} from '@nestjs/swagger';
+import { Controller, Post, Body, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -30,10 +17,10 @@ import { Public } from '../../../common/decorators/public.decorator';
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) { }
+  constructor(private readonly authService: AuthService) {}
 
-  @Public()
   @Post('register')
+  @Public()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
     summary: 'Register a new user with email - Sends OTP to email',
@@ -50,9 +37,8 @@ export class AuthController {
     return this.authService.register(registerDto);
   }
 
-
-  @Public()
   @Post('verify-email')
+  @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Verify account with OTP code',
@@ -69,8 +55,8 @@ export class AuthController {
     return this.authService.verifyOtp(verifyEmailDto);
   }
 
-  @Public()
   @Post('verify-password')
+  @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Verify password reset OTP code',
@@ -87,8 +73,8 @@ export class AuthController {
     return this.authService.verifyOtp(verifyEmailDto);
   }
 
-  @Public()
   @Post('resend-otp')
+  @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Resend OTP verification code to email' })
   @ApiResponse({
@@ -103,8 +89,8 @@ export class AuthController {
     return this.authService.resendOtp(resendOtpDto);
   }
 
-  @Public()
   @Post('login')
+  @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Login user with email' })
   @ApiResponse({
@@ -119,8 +105,8 @@ export class AuthController {
     return this.authService.login(loginDto);
   }
 
-  @Public()
   @Post('google')
+  @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Login or register with Google OAuth' })
   @ApiResponse({
@@ -135,36 +121,8 @@ export class AuthController {
     return this.authService.handleGoogleOAuth(googleOAuthDto);
   }
 
-  @Public()
-  @Post('refresh')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Refresh access token using refresh token' })
-  @ApiResponse({
-    status: 200,
-    description: 'Token refreshed successfully',
-  })
-  @ApiResponse({
-    status: 401,
-    description: 'Invalid or expired refresh token',
-  })
-  async refreshToken(@Body() refreshTokenDto: RefreshTokenDto) {
-    return this.authService.refreshToken(refreshTokenDto);
-  }
-
-  @Public()
-  @Post('logout')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Logout user (revoke refresh token)' })
-  @ApiResponse({
-    status: 200,
-    description: 'Logged out successfully',
-  })
-  async logout(@Body() refreshTokenDto: RefreshTokenDto) {
-    return this.authService.logout(refreshTokenDto.refreshToken);
-  }
-
-  @Public()
   @Post('send-reset-password')
+  @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Request password reset - Sends OTP to email' })
   @ApiResponse({
@@ -179,8 +137,8 @@ export class AuthController {
     return this.authService.sendResetPassword(forgotPasswordDto);
   }
 
-  @Public()
   @Post('reset-password')
+  @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Reset password using temporary reset token' })
   @ApiResponse({
@@ -199,20 +157,33 @@ export class AuthController {
     return this.authService.resetPassword(resetPasswordDto);
   }
 
-  @Get('profile')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get current user profile' })
+  @Post('refresh')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Refresh access token using refresh token' })
   @ApiResponse({
     status: 200,
-    description: 'Profile retrieved successfully',
+    description: 'Token refreshed successfully',
   })
   @ApiResponse({
     status: 401,
-    description: 'Unauthorized',
+    description: 'Invalid or expired refresh token',
   })
-  async getProfile(@CurrentUser('id') userId: string) {
-    return this.authService.getProfile(userId);
+  async refreshToken(@Body() refreshTokenDto: RefreshTokenDto) {
+    return this.authService.refreshToken(refreshTokenDto);
+  }
+
+  @Post('logout')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Logout user (revoke refresh token)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Logged out successfully',
+  })
+  async logout(@Body() refreshTokenDto: RefreshTokenDto) {
+    return this.authService.logout(refreshTokenDto.refreshToken);
   }
 
   @Post('change-password')

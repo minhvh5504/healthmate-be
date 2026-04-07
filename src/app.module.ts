@@ -11,6 +11,7 @@ import { UploadModule } from './modules/upload/upload.module';
 import { NotificationTimeSlotsModule } from './modules/notification-time-slots/notification-time-slots.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { CleanupService } from './common/services/cleanup.service';
+import { ProfileModule } from './modules/profile/profile.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { CleanupService } from './common/services/cleanup.service';
     UploadModule,
     RealtimeModule,
     NotificationTimeSlotsModule,
+    ProfileModule,
   ],
   providers: [
     // Global guard - apply JWT auth to all routes by default
