@@ -17,18 +17,10 @@ type UploadResult = {
 export class UploadService {
   private readonly iconUploadDir = './uploads/icons';
   private readonly avatarUploadDir = './uploads/avatars';
-  private readonly allowedExtensions = [
-    '.png',
-    '.jpg',
-    '.jpeg',
-    '.svg',
-    '.webp',
-  ];
+  private readonly allowedExtensions = ['.png', '.jpg', '.jpeg', '.svg', '.webp'];
   private readonly maxFileSize = 5 * 1024 * 1024; // 5MB
 
-  constructor(
-    @Inject(CLOUDINARY) private readonly cloudinary: typeof CloudinaryType,
-  ) { }
+  constructor(@Inject(CLOUDINARY) private readonly cloudinary: typeof CloudinaryType) {}
 
   async uploadIcon(
     file: Express.Multer.File | undefined,
@@ -47,10 +39,7 @@ export class UploadService {
     }
 
     // Put icons in a folder (helps management in Cloudinary dashboard)
-    const result = await this.uploadBufferToCloudinary(
-      file,
-      'healthmate/icons',
-    );
+    const result = await this.uploadBufferToCloudinary(file, 'healthmate/icons');
 
     return ResponseHelper.success(
       result,
@@ -90,10 +79,7 @@ export class UploadService {
       );
     }
 
-    const result = await this.uploadBufferToCloudinary(
-      file,
-      'healthmate/avatars',
-    );
+    const result = await this.uploadBufferToCloudinary(file, 'healthmate/avatars');
 
     return ResponseHelper.success(
       result,
@@ -187,13 +173,7 @@ export class UploadService {
     }
 
     // Check MIME type
-    const validMimeTypes = [
-      'image/png',
-      'image/jpeg',
-      'image/jpg',
-      'image/svg+xml',
-      'image/webp',
-    ];
+    const validMimeTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml', 'image/webp'];
     if (!validMimeTypes.includes(file.mimetype)) {
       throw new ApiException(
         MessageCodes.FILE_INVALID_TYPE,

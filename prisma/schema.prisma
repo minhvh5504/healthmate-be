@@ -25,6 +25,14 @@ model User {
   refreshTokens     RefreshToken[]
   verificationCodes VerificationCode[]
 
+  userAllergies      UserAllergy[]
+  createdMedications Medication[]
+  userMedications    UserMedication[]
+  deviceTokens       DeviceToken[]
+  notifications      Notification[]
+  relationships      UserRelationship[] @relation("UserToRelationship")
+  relatedRelationships UserRelationship[] @relation("RelatedUserToRelationship")
+
   @@index([email])
   @@index([googleId])
   @@index([role, isActive])
@@ -84,6 +92,193 @@ model VerificationCode {
   @@index([userId, type, isUsed])
   @@index([code])
   @@map("verification_codes")
+}
+
+model AllergyType {
+  id          String   @id @default(uuid())
+  name        String   @unique @db.VarChar(100)
+  displayName String   @map("display_name") @db.VarChar(100)
+  sortOrder   Int      @default(0) @map("sort_order")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  userAllergies UserAllergy[]
+
+  @@map("allergy_types")
+}
+
+model UserAllergy {
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  allergyTypeId String?  @map("allergy_type_id")
+  customName    String?  @map("custom_name") @db.VarChar(100)
+  note          String?  @db.Text
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  allergyType AllergyType? @relation(fields: [allergyTypeId], references: [id])
+
+  @@unique([userId, allergyTypeId])
+  @@map("user_allergies")
+}
+
+model MedicationCondition {
+  id          String   @id @default(uuid())
+  slug        String   @unique @db.VarChar(100)
+  displayName String   @map("display_name") @db.VarChar(100)
+  iconEmoji   String?  @map("icon_emoji") @db.VarChar(10)
+  sortOrder   Int      @default(0) @map("sort_order")
+  isActive    Boolean  @default(true) @map("is_active")
+
+  userMedications UserMedication[]
+
+  @@map("medication_conditions")
+}
+
+model Medication {
+  id           String   @id @default(uuid())
+  name         String   @db.VarChar(255)
+  genericName  String?  @map("generic_name") @db.VarChar(255)
+  form         String?  @db.VarChar(20)
+  strength     String?  @db.VarChar(50)
+  manufacturer String?  @db.VarChar(255)
+  description  String?  @db.Text
+  isVerified   Boolean  @default(false) @map("is_verified")
+  createdBy    String?  @map("created_by")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  creator         User?            @relation(fields: [createdBy], references: [id])
+  userMedications UserMedication[]
+
+  @@map("medications")
+}
+
+model UserMedication {
+  id                  String   @id @default(uuid())
+  userId              String   @map("user_id")
+  medicationId        String   @map("medication_id")
+  dosage              String?  @db.VarChar(100)
+  mealInstruction     String?  @map("meal_instruction") @db.VarChar(20)
+  mealInstructionNote String?  @map("meal_instruction_note") @db.VarChar(80)
+  conditionId         String?  @map("condition_id")
+  conditionCustom     String?  @map("condition_custom") @db.VarChar(100)
+  reminderEnabled     Boolean  @default(true) @map("reminder_enabled")
+  startDate           DateTime? @map("start_date") @db.Date
+  endDate             DateTime? @map("end_date") @db.Date
+  stockCount          Int?     @map("stock_count")
+  lowStockThreshold   Int      @default(5) @map("low_stock_threshold")
+  scannedData         Json?    @map("scanned_data")
+  isActive            Boolean  @default(true) @map("is_active")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  user              User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  medication        Medication           @relation(fields: [medicationId], references: [id])
+  condition         MedicationCondition? @relation(fields: [conditionId], references: [id])
+  reminderSchedules ReminderSchedule[]
+  medicationLogs    MedicationLog[]
+
+  @@index([userId, isActive])
+  @@index([userId, conditionId])
+  @@map("user_medications")
+}
+
+model ReminderSchedule {
+  id               String   @id @default(uuid())
+  userMedicationId String   @map("user_medication_id")
+  remindTime       String?  @map("remind_time") @db.VarChar(8)
+  repeatType       String   @default("daily") @map("repeat_type") @db.VarChar(20)
+  repeatDays       Int[]    @map("repeat_days")
+  repeatInterval   Int?     @map("repeat_interval")
+  isActive         Boolean  @default(true) @map("is_active")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  userMedication UserMedication @relation(fields: [userMedicationId], references: [id], onDelete: Cascade)
+  notifications  Notification[]
+  medicationLogs MedicationLog[]
+
+  @@map("reminder_schedules")
+}
+
+model DeviceToken {
+  id         String    @id @default(uuid())
+  userId     String    @map("user_id")
+  token      String    @unique @db.VarChar(500)
+  platform   String    @db.VarChar(10)
+  deviceName String?   @map("device_name") @db.VarChar(100)
+  isActive   Boolean   @default(true) @map("is_active")
+  lastUsedAt DateTime? @map("last_used_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, platform])
+  @@map("device_tokens")
+}
+
+model Notification {
+  id                 String    @id @default(uuid())
+  userId             String    @map("user_id")
+  reminderScheduleId String?   @map("reminder_schedule_id")
+  type               String    @db.VarChar(30)
+  channel            String    @default("push") @db.VarChar(10)
+  iconType           String    @map("icon_type") @db.VarChar(30)
+  title              String    @db.VarChar(200)
+  body               String    @db.Text
+  isRead             Boolean   @default(false) @map("is_read")
+  readAt             DateTime? @map("read_at")
+  scheduledFor       DateTime  @map("scheduled_for")
+  sentAt             DateTime? @map("sent_at")
+  deliveryStatus     String    @default("pending") @map("delivery_status") @db.VarChar(10)
+  failureReason      String?   @map("failure_reason") @db.VarChar(255)
+  actionUrl          String?   @map("action_url") @db.VarChar(500)
+
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reminderSchedule ReminderSchedule? @relation(fields: [reminderScheduleId], references: [id])
+  medicationLogs   MedicationLog[]
+
+  @@index([userId, sentAt])
+  @@index([userId, isRead])
+  @@index([scheduledFor, deliveryStatus])
+  @@index([userId, type])
+  @@map("notifications")
+}
+
+model MedicationLog {
+  id                 String    @id @default(uuid())
+  userMedicationId   String    @map("user_medication_id")
+  reminderScheduleId String?   @map("reminder_schedule_id")
+  notificationId     String?   @map("notification_id")
+  status             String    @db.VarChar(10)
+  takenAt            DateTime? @map("taken_at")
+  dosageTaken        String?   @map("dosage_taken") @db.VarChar(100)
+  note               String?   @db.Text
+  createdAt          DateTime  @default(now()) @map("created_at")
+
+  userMedication   UserMedication    @relation(fields: [userMedicationId], references: [id], onDelete: Cascade)
+  reminderSchedule ReminderSchedule? @relation(fields: [reminderScheduleId], references: [id])
+  notification     Notification?     @relation(fields: [notificationId], references: [id])
+
+  @@index([userMedicationId, createdAt])
+  @@index([userMedicationId, status])
+  @@map("medication_logs")
+}
+
+model UserRelationship {
+  id            String    @id @default(uuid())
+  userId        String    @map("user_id")
+  relatedUserId String    @map("related_user_id")
+  status        String    @default("pending") @db.VarChar(10)
+  invitedAt     DateTime  @default(now()) @map("invited_at")
+  acceptedAt    DateTime? @map("accepted_at")
+  revokedAt     DateTime? @map("revoked_at")
+
+  user        User @relation("UserToRelationship", fields: [userId], references: [id], onDelete: Cascade)
+  relatedUser User @relation("RelatedUserToRelationship", fields: [relatedUserId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, relatedUserId])
+  @@index([relatedUserId, status])
+  @@map("user_relationships")
 }
 
 enum Role {
