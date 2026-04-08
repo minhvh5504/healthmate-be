@@ -9,11 +9,12 @@ import { AdminRegisterDto } from './dto/register.dto';
 import { AdminRefreshTokenDto } from './dto/refresh-token.dto';
 import { AdminVerifyEmailDto } from './dto/verify-email.dto';
 import { AdminResendOtpDto } from './dto/resend-otp.dto';
-import { Role, VerificationType } from '@prisma/client';
+import { Role /*, VerificationType */ } from '@prisma/client';
 import { ResponseHelper } from '../../../common/interfaces/api-response.interface';
 import { MessageCodes } from '../../../common/constants/message-codes.const';
 import { ApiException } from '../../../common/exceptions/api.exception';
 import type { StringValue } from 'ms';
+import { RedisService, OtpType } from '../../redis/redis.service';
 
 export interface TokenPair {
   accessToken: string;
@@ -33,6 +34,7 @@ export class AuthAdminService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly mailService: MailService,
+    private readonly redisService: RedisService,
   ) {}
 
   /**
@@ -45,19 +47,11 @@ export class AuthAdminService {
   /**
    * Create verification code record
    */
-  private async createVerificationCode(userId: string, type: VerificationType): Promise<string> {
+  private async createVerificationCode(userId: string, type: OtpType): Promise<string> {
     const code = this.generateOtpCode();
-    const expiresAt = new Date();
-    expiresAt.setMinutes(expiresAt.getMinutes() + 5); // Expires in 5 minutes
 
-    await this.prisma.verificationCode.create({
-      data: {
-        userId,
-        code,
-        type,
-        expiresAt,
-      },
-    });
+    // Store in Redis with 5 minutes expiration (300 seconds)
+    await this.redisService.setOtp(userId, code, type, 300);
 
     return code;
   }
@@ -151,7 +145,7 @@ export class AuthAdminService {
     });
 
     // Generate OTP code
-    const otpCode = await this.createVerificationCode(user.id, VerificationType.EMAIL_VERIFICATION);
+    const otpCode = await this.createVerificationCode(user.id, OtpType.EMAIL_VERIFICATION);
 
     // Send OTP via email
     await this.mailService.sendOtpEmail(email, otpCode);
@@ -194,48 +188,27 @@ export class AuthAdminService {
       );
     }
 
-    // For admin, we only support account verification
-    const verificationType = VerificationType.EMAIL_VERIFICATION;
+    // Get code from Redis
+    const storedCode = await this.redisService.getOtp(user.id, OtpType.EMAIL_VERIFICATION);
 
-    // Find verification code
-    const verificationCode = await this.prisma.verificationCode.findFirst({
-      where: {
-        userId: user.id,
-        code,
-        type: verificationType,
-        isUsed: false,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    if (!verificationCode) {
+    if (!storedCode || storedCode !== code) {
       throw new ApiException(
         MessageCodes.INVALID_OTP,
-        'Invalid verification code',
-        400,
-        'Verification failed',
-      );
-    }
-
-    // Check if code is expired
-    if (new Date() > verificationCode.expiresAt) {
-      throw new ApiException(
-        MessageCodes.OTP_EXPIRED,
-        'Verification code has expired',
+        'Invalid or expired verification code',
         400,
         'Verification failed',
       );
     }
 
     await this.prisma.$transaction([
-      this.prisma.verificationCode.delete({
-        where: { id: verificationCode.id },
-      }),
       this.prisma.user.update({
         where: { id: user.id },
         data: { emailVerified: true },
       }),
     ]);
+
+    // Delete OTP after use
+    await this.redisService.deleteOtp(user.id, OtpType.EMAIL_VERIFICATION);
 
     // Send welcome email
     if (user.email) {
@@ -278,8 +251,6 @@ export class AuthAdminService {
       );
     }
 
-    const verificationType = VerificationType.EMAIL_VERIFICATION;
-
     if (user.emailVerified) {
       throw new ApiException(
         'AUTH.VERIFY.ALREADY_VERIFIED',
@@ -289,13 +260,14 @@ export class AuthAdminService {
       );
     }
 
-    const otpCode = await this.createVerificationCode(user.id, verificationType);
+    // Generate new OTP code and store in Redis
+    const otpCode = await this.createVerificationCode(user.id, OtpType.EMAIL_VERIFICATION);
 
     await this.mailService.sendOtpEmail(email, otpCode);
 
     return ResponseHelper.success(
       { email },
-      'AUTH.RESEND_OTP.SUCCESS',
+      MessageCodes.RESEND_OTP_SUCCESS,
       'OTP code has been resent to your email!',
       200,
     );
