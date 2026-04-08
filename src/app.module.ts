@@ -12,6 +12,7 @@ import { NotificationTimeSlotsModule } from './modules/notification-time-slots/n
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { CleanupService } from './common/services/cleanup.service';
 import { ProfileModule } from './modules/profile/profile.module';
+import { MedicationModule } from './modules/medication/medication.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { ProfileModule } from './modules/profile/profile.module';
     RealtimeModule,
     NotificationTimeSlotsModule,
     ProfileModule,
+    MedicationModule,
   ],
   providers: [
     // Global guard - apply JWT auth to all routes by default

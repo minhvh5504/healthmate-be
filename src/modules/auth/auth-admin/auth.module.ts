@@ -20,10 +20,7 @@ import type { StringValue } from 'ms';
       useFactory: (configService: ConfigService) => ({
         secret: configService.getOrThrow<string>('JWT_SECRET'),
         signOptions: {
-          expiresIn: configService.get<string>(
-            'JWT_EXPIRES_IN',
-            '7d',
-          ) as StringValue,
+          expiresIn: configService.get<string>('JWT_EXPIRES_IN', '7d') as StringValue,
         },
       }),
     }),
@@ -32,4 +29,4 @@ import type { StringValue } from 'ms';
   controllers: [AuthAdminController],
   exports: [AuthAdminService],
 })
-export class AuthAdminModule { }
+export class AuthAdminModule {}

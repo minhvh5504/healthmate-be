@@ -1,10 +1,4 @@
-import {
-  Controller,
-  Post,
-  UseInterceptors,
-  UploadedFile,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Post, UseInterceptors, UploadedFile, UseGuards } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiTags,
@@ -27,7 +21,7 @@ import { ResponseHelper } from 'src/common/interfaces/api-response.interface';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @ApiBearerAuth('JWT-auth')
 export class UploadController {
-  constructor(private readonly uploadService: UploadService) { }
+  constructor(private readonly uploadService: UploadService) {}
 
   @Post('icon')
   @Roles(Role.admin)
@@ -59,8 +53,7 @@ export class UploadController {
         message: 'Icon uploaded successfully',
         messageCode: 'SERVICE.CREATE.SUCCESS',
         data: {
-          iconUrl:
-            'https://res.cloudinary.com/<cloud>/image/upload/v123/healthmate/icons/xxx.png',
+          iconUrl: 'https://res.cloudinary.com/<cloud>/image/upload/v123/healthmate/icons/xxx.png',
           publicId: 'healthmate/icons/xxx',
         },
       },

@@ -33,7 +33,7 @@ export class AuthAdminService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly mailService: MailService,
-  ) { }
+  ) {}
 
   /**
    * Generate 6-digit OTP code
@@ -45,10 +45,7 @@ export class AuthAdminService {
   /**
    * Create verification code record
    */
-  private async createVerificationCode(
-    userId: string,
-    type: VerificationType,
-  ): Promise<string> {
+  private async createVerificationCode(userId: string, type: VerificationType): Promise<string> {
     const code = this.generateOtpCode();
     const expiresAt = new Date();
     expiresAt.setMinutes(expiresAt.getMinutes() + 5); // Expires in 5 minutes
@@ -78,19 +75,13 @@ export class AuthAdminService {
     // Generate access token
     const accessToken = this.jwtService.sign(payload, {
       secret: this.configService.getOrThrow<string>('JWT_SECRET'),
-      expiresIn: this.configService.get<string>(
-        'JWT_EXPIRES_IN',
-        '7d',
-      ) as StringValue,
+      expiresIn: this.configService.get<string>('JWT_EXPIRES_IN', '7d') as StringValue,
     });
 
     // Generate refresh token
     const refreshToken = this.jwtService.sign(payload, {
       secret: this.configService.getOrThrow<string>('JWT_REFRESH_SECRET'),
-      expiresIn: this.configService.get<string>(
-        'JWT_REFRESH_EXPIRES_IN',
-        '30d',
-      ) as StringValue,
+      expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRES_IN', '30d') as StringValue,
     });
 
     // Calculate expiration date for refresh token (30 days)
@@ -160,10 +151,7 @@ export class AuthAdminService {
     });
 
     // Generate OTP code
-    const otpCode = await this.createVerificationCode(
-      user.id,
-      VerificationType.EMAIL_VERIFICATION,
-    );
+    const otpCode = await this.createVerificationCode(user.id, VerificationType.EMAIL_VERIFICATION);
 
     // Send OTP via email
     await this.mailService.sendOtpEmail(email, otpCode);
@@ -301,10 +289,7 @@ export class AuthAdminService {
       );
     }
 
-    const otpCode = await this.createVerificationCode(
-      user.id,
-      verificationType,
-    );
+    const otpCode = await this.createVerificationCode(user.id, verificationType);
 
     await this.mailService.sendOtpEmail(email, otpCode);
 
@@ -358,10 +343,7 @@ export class AuthAdminService {
     }
 
     // Verify password
-    const isPasswordValid = await this.comparePasswords(
-      password,
-      user.password || '',
-    );
+    const isPasswordValid = await this.comparePasswords(password, user.password || '');
 
     if (!isPasswordValid) {
       throw new ApiException(
@@ -373,11 +355,7 @@ export class AuthAdminService {
     }
 
     // Generate tokens
-    const tokens = await this.generateTokenPair(
-      user.id,
-      user.email,
-      user.role,
-    );
+    const tokens = await this.generateTokenPair(user.id, user.email, user.role);
 
     // Remove password from response
     const { password: _password, ...userWithoutPassword } = user;
@@ -523,10 +501,7 @@ export class AuthAdminService {
   /**
    * Compare passwords
    */
-  private async comparePasswords(
-    plainPassword: string,
-    hashedPassword: string,
-  ): Promise<boolean> {
+  private async comparePasswords(plainPassword: string, hashedPassword: string): Promise<boolean> {
     return bcrypt.compare(plainPassword, hashedPassword);
   }
 }
