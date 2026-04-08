@@ -13,6 +13,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { CleanupService } from './common/services/cleanup.service';
 import { ProfileModule } from './modules/profile/profile.module';
 import { MedicationModule } from './modules/medication/medication.module';
+import { RedisModule } from './modules/redis/redis.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { MedicationModule } from './modules/medication/medication.module';
 
     // Global modules
     PrismaModule,
+    RedisModule,
 
     // Feature modules
     AuthModule,

@@ -23,7 +23,6 @@ model User {
 
   profile           UserProfile?
   refreshTokens     RefreshToken[]
-  verificationCodes VerificationCode[]
 
   userAllergies      UserAllergy[]
   createdMedications Medication[]
@@ -79,20 +78,6 @@ model RefreshToken {
   @@map("refresh_tokens")
 }
 
-model VerificationCode {
-  id        String           @id @default(uuid())
-  userId    String           @map("user_id")
-  code      String
-  type      VerificationType @map("type")
-  expiresAt DateTime         @map("expires_at")
-  isUsed    Boolean          @default(false) @map("is_used")
-  createdAt DateTime         @default(now()) @map("created_at")
-  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, type, isUsed])
-  @@index([code])
-  @@map("verification_codes")
-}
 
 model AllergyType {
   id          String   @id @default(uuid())
@@ -292,7 +277,3 @@ enum Gender {
   other
 }
 
-enum VerificationType {
-  EMAIL_VERIFICATION
-  PASSWORD_RESET
-}

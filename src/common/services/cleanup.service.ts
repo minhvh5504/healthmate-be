@@ -10,27 +10,28 @@ export class CleanupService {
 
   /**
    * Automatically delete expired verification codes every minute
+   * (Commented out because VerificationCode table was removed)
    */
-  @Cron(CronExpression.EVERY_MINUTE)
-  async cleanupExpiredVerificationCodes() {
-    this.logger.log('Cleaning up expired verification codes...');
-    
-    try {
-      const result = await this.prisma.verificationCode.deleteMany({
-        where: {
-          expiresAt: {
-            lt: new Date(),
-          },
-        },
-      });
-      
-      if (result.count > 0) {
-        this.logger.log(`Successfully deleted ${result.count} expired verification codes.`);
-      }
-    } catch (error) {
-      this.logger.error('Error cleaning up verification codes:', error);
-    }
-  }
+  // @Cron(CronExpression.EVERY_MINUTE)
+  // async cleanupExpiredVerificationCodes() {
+  //   this.logger.log('Cleaning up expired verification codes...');
+  //   
+  //   try {
+  //     const result = await this.prisma.verificationCode.deleteMany({
+  //       where: {
+  //         expiresAt: {
+  //           lt: new Date(),
+  //         },
+  //       },
+  //     });
+  //     
+  //     if (result.count > 0) {
+  //       this.logger.log(`Successfully deleted ${result.count} expired verification codes.`);
+  //     }
+  //   } catch (error) {
+  //     this.logger.error('Error cleaning up verification codes:', error);
+  //   }
+  // }
 
   /**
    * Cleanup expired refresh tokens once a day
