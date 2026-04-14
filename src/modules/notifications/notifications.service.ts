@@ -1,265 +1,113 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { MailService } from './mail.service';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as Handlebars from 'handlebars';
-
-interface BookingEmailData {
-  bookingId: string;
-  patientName: string;
-  patientEmail: string;
-  doctorName: string;
-  serviceName: string;
-  bookingDate: string;
-  startTime: string;
-  endTime: string;
-  duration: number;
-  status: string;
-  price?: number;
-  patientNotes?: string;
-  queuePosition?: number;
-  estimatedWaitTime?: number;
-}
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { GetNotificationsDto } from './dto/get-notifications.dto';
 
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
-  private bookingConfirmationTemplate: HandlebarsTemplateDelegate;
-  private queuePromotionTemplate: HandlebarsTemplateDelegate;
 
-  constructor(private readonly mailService: MailService) {
-    this.loadTemplates();
-  }
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly realtimeGateway: RealtimeGateway,
+  ) {}
 
-  /**
-   * Load and compile Handlebars templates
-   */
-  private loadTemplates() {
-    try {
-      const templatesDir = path.join(__dirname, 'templates');
+  async findAll(userId: string, query: GetNotificationsDto) {
+    const { isRead, type, limit = 20, page = 1 } = query;
+    const skip = (page - 1) * limit;
 
-      // Load booking confirmation template
-      const bookingConfirmationPath = path.join(
-        templatesDir,
-        'booking-confirmation.hbs',
-      );
-      const bookingConfirmationSource = fs.readFileSync(
-        bookingConfirmationPath,
-        'utf-8',
-      );
-      this.bookingConfirmationTemplate = Handlebars.compile(
-        bookingConfirmationSource,
-      );
+    const where: any = { userId };
+    if (isRead !== undefined) where.isRead = isRead;
+    if (type) where.type = type;
 
-      // Load queue promotion template
-      const queuePromotionPath = path.join(templatesDir, 'queue-promotion.hbs');
-      const queuePromotionSource = fs.readFileSync(queuePromotionPath, 'utf-8');
-      this.queuePromotionTemplate = Handlebars.compile(queuePromotionSource);
+    const [total, items] = await Promise.all([
+      (this.prisma as any).notification.count({ where }),
+      (this.prisma as any).notification.findMany({
+        where,
+        take: limit,
+        skip,
+        orderBy: { scheduledFor: 'desc' },
+      }),
+    ]);
 
-      this.logger.log('Email templates loaded successfully');
-    } catch (error) {
-      this.logger.error('Failed to load email templates:', error);
-      this.logger.warn(
-        'Email notifications will not be sent with custom templates',
-      );
-    }
-  }
-
-  /**
-   * Send booking confirmation email
-   */
-  async sendBookingConfirmation(data: BookingEmailData): Promise<void> {
-    try {
-      const isQueued = data.status === 'QUEUED';
-      const isPending = data.status === 'PENDING';
-
-      const html = this.bookingConfirmationTemplate({
-        ...data,
-        isQueued,
-        isPending,
-        statusClass: this.getStatusClass(data.status),
-      });
-
-      const subject = isQueued
-        ? '⏳ Your Booking is in Queue - Healthmate'
-        : isPending
-          ? '📅 Booking Scheduled - Healthmate'
-          : '✅ Booking Confirmed - Healthmate';
-
-      await this.mailService.sendMail(data.patientEmail, subject, html);
-
-      this.logger.log(
-        `Booking confirmation email sent to ${data.patientEmail}`,
-      );
-    } catch (error) {
-      this.logger.error('Failed to send booking confirmation email:', error);
-    }
-  }
-
-  /**
-   * Send queue promotion notification
-   */
-  async sendQueuePromotion(data: BookingEmailData): Promise<void> {
-    try {
-      const html = this.queuePromotionTemplate(data);
-
-      const subject = '🎉 Your Appointment is Confirmed! - Healthmate';
-
-      await this.mailService.sendMail(data.patientEmail, subject, html);
-
-      this.logger.log(`Queue promotion email sent to ${data.patientEmail}`);
-    } catch (error) {
-      this.logger.error('Failed to send queue promotion email:', error);
-    }
-  }
-
-  /**
-   * Send booking cancellation notification
-   */
-  async sendBookingCancellation(data: BookingEmailData): Promise<void> {
-    try {
-      const html = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <style>
-              body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-              .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-              .header { background: #dc3545; color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-              .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
-              .booking-card { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; }
-              .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #888; }
-            </style>
-          </head>
-          <body>
-            <div class="container">
-              <div class="header">
-                <h1>🏥 Healthmate</h1>
-                <p>Booking Cancellation</p>
-              </div>
-              <div class="content">
-                <h2>Hello ${data.patientName},</h2>
-                <p>Your appointment has been cancelled.</p>
-                
-                <div class="booking-card">
-                  <h3>📋 Cancelled Booking Details</h3>
-                  <p><strong>Booking ID:</strong> ${data.bookingId}</p>
-                  <p><strong>Doctor:</strong> ${data.doctorName}</p>
-                  <p><strong>Service:</strong> ${data.serviceName}</p>
-                  <p><strong>Date:</strong> ${data.bookingDate}</p>
-                  <p><strong>Time:</strong> ${data.startTime} - ${data.endTime}</p>
-                </div>
-                
-                <p>If you did not request this cancellation or have any questions, please contact us immediately.</p>
-                <p>We hope to serve you again soon!</p>
-                
-                <p>Best regards,<br>Healthmate Team</p>
-              </div>
-              <div class="footer">
-                <p>This is an automated email. Please do not reply.</p>
-                <p>&copy; 2025 Healthmate. All rights reserved.</p>
-              </div>
-            </div>
-          </body>
-        </html>
-      `;
-
-      const subject = '❌ Booking Cancelled - Healthmate';
-
-      await this.mailService.sendMail(data.patientEmail, subject, html);
-
-      this.logger.log(
-        `Booking cancellation email sent to ${data.patientEmail}`,
-      );
-    } catch (error) {
-      this.logger.error('Failed to send booking cancellation email:', error);
-    }
-  }
-
-  /**
-   * Send booking reminder (24 hours before)
-   */
-  async sendBookingReminder(data: BookingEmailData): Promise<void> {
-    try {
-      const html = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <style>
-              body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-              .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-              .header { background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-              .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
-              .booking-card { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; }
-              .alert { background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; }
-              .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #888; }
-            </style>
-          </head>
-          <body>
-            <div class="container">
-              <div class="header">
-                <h1>🏥 Healthmate</h1>
-                <p>Appointment Reminder</p>
-              </div>
-              <div class="content">
-                <h2>Hello ${data.patientName}! 👋</h2>
-                <p><strong>This is a friendly reminder about your upcoming appointment tomorrow.</strong></p>
-                
-                <div class="booking-card">
-                  <h3>📋 Appointment Details</h3>
-                  <p><strong>Doctor:</strong> ${data.doctorName}</p>
-                  <p><strong>Service:</strong> ${data.serviceName}</p>
-                  <p><strong>Date:</strong> ${data.bookingDate}</p>
-                  <p><strong>Time:</strong> ${data.startTime} - ${data.endTime}</p>
-                </div>
-                
-                <div class="alert">
-                  <strong>📌 Please Remember:</strong>
-                  <ul>
-                    <li>Arrive 10 minutes early</li>
-                    <li>Bring your ID and medical documents</li>
-                    <li>If you need to cancel, please do so ASAP</li>
-                  </ul>
-                </div>
-                
-                <p>We look forward to seeing you!</p>
-                
-                <p>Best regards,<br>Healthmate Team</p>
-              </div>
-              <div class="footer">
-                <p>This is an automated email. Please do not reply.</p>
-                <p>&copy; 2025 Healthmate. All rights reserved.</p>
-              </div>
-            </div>
-          </body>
-        </html>
-      `;
-
-      const subject = '⏰ Appointment Reminder - Tomorrow - Healthmate';
-
-      await this.mailService.sendMail(data.patientEmail, subject, html);
-
-      this.logger.log(`Booking reminder email sent to ${data.patientEmail}`);
-    } catch (error) {
-      this.logger.error('Failed to send booking reminder email:', error);
-    }
-  }
-
-  /**
-   * Get status CSS class
-   */
-  private getStatusClass(status: string): string {
-    const statusMap: Record<string, string> = {
-      PENDING: 'pending',
-      CONFIRMED: 'confirmed',
-      QUEUED: 'queued',
-      CHECKED_IN: 'confirmed',
-      IN_PROGRESS: 'confirmed',
-      COMPLETED: 'confirmed',
-      CANCELLED: 'pending',
-      NO_SHOW: 'pending',
+    return {
+      items,
+      meta: {
+        total,
+        limit,
+        page,
+        totalPages: Math.ceil(total / limit),
+      },
     };
+  }
 
-    return statusMap[status] || 'pending';
+  async findOne(userId: string, id: string) {
+    const notification = await (this.prisma as any).notification.findFirst({
+      where: { id, userId },
+    });
+
+    if (!notification) {
+      throw new NotFoundException('Notification not found');
+    }
+
+    return notification;
+  }
+
+  async markAsRead(userId: string, id: string) {
+    return (this.prisma as any).notification.update({
+      where: { id, userId },
+      data: { isRead: true, readAt: new Date() },
+    });
+  }
+
+  async markAllAsRead(userId: string) {
+    return (this.prisma as any).notification.updateMany({
+      where: { userId, isRead: false },
+      data: { isRead: true, readAt: new Date() },
+    });
+  }
+
+  async remove(id: string, userId: string) {
+    return (this.prisma as any).notification.delete({
+      where: { id, userId },
+    });
+  }
+
+  async removeAll(userId: string) {
+    return (this.prisma as any).notification.deleteMany({
+      where: { userId },
+    });
+  }
+
+  /**
+   * Internal method to create and emit a notification
+   */
+  async createNotification(data: {
+    userId: string;
+    type: string;
+    title: string;
+    body: string;
+    iconType?: string;
+    actionUrl?: string;
+    scheduledFor?: Date;
+  }) {
+    const notification = await (this.prisma as any).notification.create({
+      data: {
+        userId: data.userId,
+        type: data.type,
+        title: data.title,
+        body: data.body,
+        iconType: data.iconType || 'info',
+        actionUrl: data.actionUrl,
+        scheduledFor: data.scheduledFor || new Date(),
+        deliveryStatus: 'sent',
+        sentAt: new Date(),
+      },
+    });
+
+    // Emit real-time notification
+    this.realtimeGateway.emitNotification(data.userId, notification);
+
+    return notification;
   }
 }

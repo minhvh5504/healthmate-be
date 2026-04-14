@@ -3,7 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
-import { MailService } from '../../notifications/mail.service';
+import { MailService } from '../../mails/mail.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
@@ -18,7 +18,7 @@ import { ResponseHelper } from '../../../common/interfaces/api-response.interfac
 import { MessageCodes } from '../../../common/constants/message-codes.const';
 import { ApiException } from '../../../common/exceptions/api.exception';
 import type { StringValue } from 'ms';
-import { MockSmsService } from '../../notifications/sms.service';
+import { MockSmsService } from '../../mails/sms.service';
 import { GoogleOAuthService } from './services/google-oauth.service';
 import { RedisService, OtpType } from '../../redis/redis.service';
 

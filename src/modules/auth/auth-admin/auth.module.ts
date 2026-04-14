@@ -5,7 +5,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthAdminService } from './auth.service';
 import { AuthAdminController } from './auth.controller';
 import { PrismaModule } from '../../prisma/prisma.module';
-import { NotificationsModule } from '../../notifications/notifications.module';
+import { MailsModule } from '../../mails/mails.module';
 import { JwtAdminStrategy } from './strategies/jwt.strategy';
 import type { StringValue } from 'ms';
 
@@ -13,7 +13,7 @@ import type { StringValue } from 'ms';
   imports: [
     PrismaModule,
     PassportModule,
-    NotificationsModule,
+    MailsModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
