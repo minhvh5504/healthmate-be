@@ -1,3 +1,4 @@
+
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
@@ -266,7 +267,7 @@ export class MailService {
   }
 
   /**
-   * Public method to send email (for NotificationsService)
+   * Public method to send email (for MailsService)
    */
   async sendMail(
     to: string,

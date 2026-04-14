@@ -1,10 +1,12 @@
 import { Module } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
-import { MailService } from './mail.service';
-import { MockSmsService } from './sms.service';
+import { NotificationsController } from './notifications.controller';
+import { RealtimeModule } from '../realtime/realtime.module';
 
 @Module({
-  providers: [NotificationsService, MailService],
-  exports: [NotificationsService, MailService],
+  imports: [RealtimeModule],
+  controllers: [NotificationsController],
+  providers: [NotificationsService],
+  exports: [NotificationsService],
 })
-export class NotificationsModule { }
+export class NotificationsModule {}

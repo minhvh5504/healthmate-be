@@ -6,8 +6,8 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { PrismaModule } from '../../prisma/prisma.module';
-import { NotificationsModule } from '../../notifications/notifications.module';
-import { MockSmsService } from '../../notifications/sms.service';
+import { MailsModule } from '../../mails/mails.module';
+import { MockSmsService } from '../../mails/sms.service';
 import type { StringValue } from 'ms';
 import { GoogleOAuthService } from './services/google-oauth.service';
 
@@ -15,7 +15,7 @@ import { GoogleOAuthService } from './services/google-oauth.service';
   imports: [
     PrismaModule,
     PassportModule,
-    NotificationsModule,
+    MailsModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

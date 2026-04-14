@@ -14,6 +14,8 @@ import { ProfileModule } from './modules/profile/profile.module';
 import { MedicationModule } from './modules/medication/medication.module';
 import { RedisModule } from './modules/redis/redis.module';
 import { UserMedicationModule } from './modules/user-medication/user-medication.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { MailsModule } from './modules/mails/mails.module';
 
 @Module({
   imports: [
@@ -45,6 +47,8 @@ import { UserMedicationModule } from './modules/user-medication/user-medication.
     ProfileModule,
     MedicationModule,
     UserMedicationModule,
+    NotificationsModule,
+    MailsModule,
   ],
   providers: [
     // Global guard - apply JWT auth to all routes by default
