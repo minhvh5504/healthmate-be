@@ -56,6 +56,8 @@ model UserProfile {
   gender      Gender?
   heightCm    Decimal?  @map("height_cm") @db.Decimal(5, 2)
   weightKg    Decimal?  @map("weight_kg") @db.Decimal(5, 2)
+  bmi         Decimal?  @db.Decimal(5, 2)
+  bmiStatus   String?   @map("bmi_status") @db.VarChar(50)
   allergies   String?   @db.Text
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
