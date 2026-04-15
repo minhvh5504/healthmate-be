@@ -39,17 +39,9 @@ export class MailsService {
       const templatesDir = path.join(__dirname, 'templates');
 
       // Load booking confirmation template
-      const bookingConfirmationPath = path.join(
-        templatesDir,
-        'booking-confirmation.hbs',
-      );
-      const bookingConfirmationSource = fs.readFileSync(
-        bookingConfirmationPath,
-        'utf-8',
-      );
-      this.bookingConfirmationTemplate = Handlebars.compile(
-        bookingConfirmationSource,
-      );
+      const bookingConfirmationPath = path.join(templatesDir, 'booking-confirmation.hbs');
+      const bookingConfirmationSource = fs.readFileSync(bookingConfirmationPath, 'utf-8');
+      this.bookingConfirmationTemplate = Handlebars.compile(bookingConfirmationSource);
 
       // Load queue promotion template
       const queuePromotionPath = path.join(templatesDir, 'queue-promotion.hbs');
@@ -59,9 +51,7 @@ export class MailsService {
       this.logger.log('Email templates loaded successfully');
     } catch (error) {
       this.logger.error('Failed to load email templates:', error);
-      this.logger.warn(
-        'Email notifications will not be sent with custom templates',
-      );
+      this.logger.warn('Email notifications will not be sent with custom templates');
     }
   }
 
@@ -88,9 +78,7 @@ export class MailsService {
 
       await this.mailService.sendMail(data.patientEmail, subject, html);
 
-      this.logger.log(
-        `Booking confirmation email sent to ${data.patientEmail}`,
-      );
+      this.logger.log(`Booking confirmation email sent to ${data.patientEmail}`);
     } catch (error) {
       this.logger.error('Failed to send booking confirmation email:', error);
     }
@@ -168,9 +156,7 @@ export class MailsService {
 
       await this.mailService.sendMail(data.patientEmail, subject, html);
 
-      this.logger.log(
-        `Booking cancellation email sent to ${data.patientEmail}`,
-      );
+      this.logger.log(`Booking cancellation email sent to ${data.patientEmail}`);
     } catch (error) {
       this.logger.error('Failed to send booking cancellation email:', error);
     }

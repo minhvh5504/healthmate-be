@@ -17,6 +17,7 @@ import { Role /*, VerificationType */ } from '@prisma/client';
 import { ResponseHelper } from '../../../common/interfaces/api-response.interface';
 import { MessageCodes } from '../../../common/constants/message-codes.const';
 import { ApiException } from '../../../common/exceptions/api.exception';
+import * as ms from 'ms';
 import type { StringValue } from 'ms';
 import { MockSmsService } from '../../mails/sms.service';
 import { GoogleOAuthService } from './services/google-oauth.service';
@@ -80,9 +81,9 @@ export class AuthService {
       expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRES_IN', '30d') as StringValue,
     });
 
-    // Calculate expiration date for refresh token (30 days)
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 30);
+    // Calculate expiration date for refresh token from config
+    const refreshTokenExpiresIn = this.configService.get<string>('JWT_REFRESH_EXPIRES_IN', '30d');
+    const expiresAt = new Date(Date.now() + ms(refreshTokenExpiresIn as StringValue));
 
     // Store refresh token in database
     await this.prisma.refreshToken.create({

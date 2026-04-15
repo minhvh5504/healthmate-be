@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { GetNotificationsDto } from './dto/get-notifications.dto';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class NotificationsService {
@@ -16,13 +17,13 @@ export class NotificationsService {
     const { isRead, type, limit = 20, page = 1 } = query;
     const skip = (page - 1) * limit;
 
-    const where: any = { userId };
+    const where: Prisma.NotificationWhereInput = { userId };
     if (isRead !== undefined) where.isRead = isRead;
     if (type) where.type = type;
 
     const [total, items] = await Promise.all([
-      (this.prisma as any).notification.count({ where }),
-      (this.prisma as any).notification.findMany({
+      this.prisma.notification.count({ where }),
+      this.prisma.notification.findMany({
         where,
         take: limit,
         skip,
@@ -42,7 +43,7 @@ export class NotificationsService {
   }
 
   async findOne(userId: string, id: string) {
-    const notification = await (this.prisma as any).notification.findFirst({
+    const notification = await this.prisma.notification.findFirst({
       where: { id, userId },
     });
 
@@ -54,27 +55,27 @@ export class NotificationsService {
   }
 
   async markAsRead(userId: string, id: string) {
-    return (this.prisma as any).notification.update({
+    return await this.prisma.notification.update({
       where: { id, userId },
       data: { isRead: true, readAt: new Date() },
     });
   }
 
   async markAllAsRead(userId: string) {
-    return (this.prisma as any).notification.updateMany({
+    return await this.prisma.notification.updateMany({
       where: { userId, isRead: false },
       data: { isRead: true, readAt: new Date() },
     });
   }
 
   async remove(id: string, userId: string) {
-    return (this.prisma as any).notification.delete({
+    return await this.prisma.notification.delete({
       where: { id, userId },
     });
   }
 
   async removeAll(userId: string) {
-    return (this.prisma as any).notification.deleteMany({
+    return await this.prisma.notification.deleteMany({
       where: { userId },
     });
   }
@@ -91,7 +92,7 @@ export class NotificationsService {
     actionUrl?: string;
     scheduledFor?: Date;
   }) {
-    const notification = await (this.prisma as any).notification.create({
+    const notification = await this.prisma.notification.create({
       data: {
         userId: data.userId,
         type: data.type,
