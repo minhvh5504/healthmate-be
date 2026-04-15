@@ -19,6 +19,7 @@ import { MailsModule } from './modules/mails/mails.module';
 import { UserRelationshipsModule } from './modules/user-relationships/user-relationships.module';
 import { MedicationConditionsModule } from './modules/medication-conditions/medication-conditions.module';
 import { ReminderSchedulesModule } from './modules/reminder-schedules/reminder-schedules.module';
+import { MedicationLogsModule } from './modules/medication-logs/medication-logs.module';
 
 @Module({
   imports: [
@@ -55,6 +56,7 @@ import { ReminderSchedulesModule } from './modules/reminder-schedules/reminder-s
     UserRelationshipsModule,
     MedicationConditionsModule,
     ReminderSchedulesModule,
+    MedicationLogsModule,
   ],
   providers: [
     // Global guard - apply JWT auth to all routes by default
