@@ -12,7 +12,7 @@ import { Logger } from '@nestjs/common';
 
 @WebSocketGateway({
   cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: process.env.FRONTEND_URL || '*',
     credentials: true,
   },
 })
@@ -33,116 +33,41 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   // Join room for specific user to receive notifications
   @SubscribeMessage('join:user')
   handleJoinUser(@ConnectedSocket() client: Socket, @MessageBody() data: { userId: string }) {
+    if (!data.userId) return { event: 'error', message: 'userId is required' };
+
     const room = `user-${data.userId}`;
-    client.join(room);
-    this.logger.log(`Client ${client.id} joined ${room}`);
+    void client.join(room);
+    this.logger.log(`Client ${client.id} joined room ${room}`);
     return { event: 'joined', room };
   }
 
-  // Generic notification emit
+  /**
+   * Generic notification emit
+   * Used by NotificationsService to push updates to specific users
+   */
   emitNotification(userId: string, notification: any) {
     const room = `user-${userId}`;
     this.server.to(room).emit('notification:new', notification);
     this.logger.log(`Emitted notification:new to ${room}`);
   }
 
-  // Emit when new order is created and pending confirmation
-  emitOrderPendingConfirmation(order: any) {
-    this.server.to('staff').emit('order:pending:confirmation', order);
-    this.logger.log(`Emitted order:pending:confirmation to staff - Order ${order.orderNumber}`);
+  /**
+   * Emit relationship update
+   * Notifies user when a relationship status changes (invite, accept, etc.)
+   */
+  emitRelationshipUpdate(userId: string, data: any) {
+    const room = `user-${userId}`;
+    this.server.to(room).emit('relationship:update', data);
+    this.logger.log(`Emitted relationship:update to ${room}`);
   }
 
-  // Emit when staff confirms order
-  emitOrderConfirmed(order: any) {
-    // Notify customer
-    this.server.to(`order-${order.id}`).emit('order:confirmed', order);
-    this.server.to(`table-${order.serviceAreaId}`).emit('order:confirmed', order);
-    this.logger.log(`Emitted order:confirmed - Order ${order.orderNumber}`);
-  }
-
-  // Emit when staff rejects order
-  emitOrderRejected(order: any, reason: string) {
-    // Notify customer
-    this.server.to(`order-${order.id}`).emit('order:rejected', {
-      order,
-      reason,
-    });
-    this.server.to(`table-${order.serviceAreaId}`).emit('order:rejected', {
-      order,
-      reason,
-    });
-    this.logger.log(`Emitted order:rejected - Order ${order.orderNumber}`);
-  }
-
-  // Emit when order is routed to kitchen/bar
-  emitOrderRouted(order: any, targetStation: string) {
-    // Determine if it's kitchen or bar based on venue type
-    const room = targetStation.toLowerCase().includes('bar')
-      ? `bar-${order.venueId}`
-      : `kitchen-${order.venueId}`;
-
-    this.server.to(room).emit('order:routed', {
-      order,
-      targetStation,
-    });
-    this.logger.log(`Emitted order:routed to ${room} - Order ${order.orderNumber}`);
-  }
-
-  // Emit when order status changes to IN_PREP
-  emitOrderInPrep(order: any) {
-    // Notify customer
-    this.server.to(`order-${order.id}`).emit('order:in_prep', order);
-    this.server.to(`table-${order.serviceAreaId}`).emit('order:in_prep', order);
-
-    // Notify staff
-    this.server.to('staff').emit('order:in_prep', order);
-
-    this.logger.log(`Emitted order:in_prep - Order ${order.orderNumber}`);
-  }
-
-  // Emit when order status changes to READY
-  emitOrderReady(order: any) {
-    // Notify customer
-    this.server.to(`order-${order.id}`).emit('order:ready', order);
-    this.server.to(`table-${order.serviceAreaId}`).emit('order:ready', order);
-
-    // Notify staff
-    this.server.to('staff').emit('order:ready', order);
-
-    this.logger.log(`Emitted order:ready - Order ${order.orderNumber}`);
-  }
-
-  // Emit when order status changes to SERVED
-  emitOrderServed(order: any) {
-    // Notify customer
-    this.server.to(`order-${order.id}`).emit('order:served', order);
-    this.server.to(`table-${order.serviceAreaId}`).emit('order:served', order);
-
-    this.logger.log(`Emitted order:served - Order ${order.orderNumber}`);
-  }
-
-  // Emit when order is cancelled
-  emitOrderCancelled(order: any, reason: string) {
-    // Notify all relevant parties
-    this.server.to(`order-${order.id}`).emit('order:cancelled', {
-      order,
-      reason,
-    });
-    this.server.to(`table-${order.serviceAreaId}`).emit('order:cancelled', {
-      order,
-      reason,
-    });
-    this.server.to('staff').emit('order:cancelled', {
-      order,
-      reason,
-    });
-
-    this.logger.log(`Emitted order:cancelled - Order ${order.orderNumber}`);
-  }
-
-  // Emit when individual order item status changes
-  emitOrderItemStatusUpdate(orderId: string, orderItem: any) {
-    this.server.to(`order-${orderId}`).emit('order:item:status', orderItem);
-    this.logger.log(`Emitted order:item:status - Order ${orderId}, Item ${orderItem.id}`);
+  /**
+   * Emit medication reminder
+   * Specific event for medication alerts
+   */
+  emitMedicationReminder(userId: string, reminder: any) {
+    const room = `user-${userId}`;
+    this.server.to(room).emit('medication:reminder', reminder);
+    this.logger.log(`Emitted medication:reminder to ${room}`);
   }
 }

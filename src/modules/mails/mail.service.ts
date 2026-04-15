@@ -1,4 +1,3 @@
-
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
@@ -24,9 +23,7 @@ export class MailService {
 
     // If email config is not set, use console logging only
     if (!mailHost || !mailUser || !mailPassword) {
-      this.logger.warn(
-        'Email configuration not found. Emails will be logged to console only.',
-      );
+      this.logger.warn('Email configuration not found. Emails will be logged to console only.');
       return;
     }
 
@@ -53,11 +50,7 @@ export class MailService {
   /**
    * Send verification email with OTP code
    */
-  async sendVerificationEmail(
-    email: string,
-    fullName: string,
-    code: string,
-  ): Promise<void> {
+  async sendVerificationEmail(email: string, fullName: string, code: string): Promise<void> {
     const subject = 'Verify Your Email - Healthmate';
     const html = `
       <!DOCTYPE html>
@@ -217,11 +210,7 @@ export class MailService {
   /**
    * Send forgot password email with OTP code
    */
-  async sendForgotPasswordEmail(
-    email: string,
-    fullName: string,
-    code: string,
-  ): Promise<void> {
+  async sendForgotPasswordEmail(email: string, fullName: string, code: string): Promise<void> {
     const subject = 'Quên mật khẩu - Healthmate';
     const html = `
       <!DOCTYPE html>

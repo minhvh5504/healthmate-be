@@ -52,9 +52,9 @@ services:
 
       # JWT Secrets
       JWT_SECRET: healthmate_dev_jwt_secret_key_2026_change_in_production
-      JWT_EXPIRES_IN: 7d
+      JWT_EXPIRES_IN: 1d
       JWT_REFRESH_SECRET: healthmate_dev_jwt_refresh_secret_key_2026_change_in_production
-      JWT_REFRESH_EXPIRES_IN: 30d
+      JWT_REFRESH_EXPIRES_IN: 7d
 
       # Application
       PORT: 8080
