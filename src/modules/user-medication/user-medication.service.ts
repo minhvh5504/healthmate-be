@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateUserMedicationDto } from './dto/create-user-medication.dto';
 import { UpdateUserMedicationDto } from './dto/update-user-medication.dto';
 import { ScanMedicationDto } from './dto/scan-medication.dto';
@@ -9,12 +10,19 @@ import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class UserMedicationService {
-  constructor(private prisma: PrismaService) {}
-
+  constructor(
+    private prisma: PrismaService,
+    private notificationsService: NotificationsService,
+  ) {}
+  /**
+   * Create user medication
+   */
   async create(createUserMedicationDto: CreateUserMedicationDto, userId: string) {
+    const { schedules, frequency, selectedDays, ...medicationData } = createUserMedicationDto;
+
     // 1. Verify medication exists
     const medication = await this.prisma.medication.findUnique({
-      where: { id: createUserMedicationDto.medicationId },
+      where: { id: medicationData.medicationId },
     });
 
     if (!medication) {
@@ -24,9 +32,9 @@ export class UserMedicationService {
     }
 
     // 2. Check condition if provided
-    if (createUserMedicationDto.conditionId) {
+    if (medicationData.conditionId) {
       const condition = await this.prisma.medicationCondition.findUnique({
-        where: { id: createUserMedicationDto.conditionId },
+        where: { id: medicationData.conditionId },
       });
       if (!condition) {
         throw new NotFoundException(
@@ -35,17 +43,55 @@ export class UserMedicationService {
       }
     }
 
-    // 3. Create UserMedication
-    const userMedication = await this.prisma.userMedication.create({
-      data: {
-        userId,
-        ...createUserMedicationDto,
-      },
-      include: {
-        medication: true,
-        condition: true,
-      },
+    // 3. Use transaction to create UserMedication + ReminderSchedules atomically
+    const userMedication = await this.prisma.$transaction(async (tx) => {
+      return tx.userMedication.create({
+        data: {
+          userId,
+          ...medicationData,
+          // Nested create for each schedule slot sent from mobile
+          reminderSchedules: schedules?.length
+            ? {
+                create: schedules.map((s) => ({
+                  remindTime: s.time,
+                  dosage: s.doses.toString(),
+                  repeatType: frequency || 'daily',
+                  repeatDays: selectedDays || [],
+                })),
+              }
+            : undefined,
+        },
+        include: {
+          medication: true,
+          condition: true,
+          reminderSchedules: true,
+        },
+      });
     });
+
+    // 4. Create a pending Notification for each ReminderSchedule
+    if (userMedication.reminderSchedules?.length) {
+      await Promise.all(
+        userMedication.reminderSchedules.map((schedule) => {
+          const scheduledFor = this.getNextScheduledTime(schedule.remindTime);
+          return this.prisma.notification.create({
+            data: {
+              userId,
+              reminderScheduleId: schedule.id,
+              type: 'medication_reminder',
+              channel: 'push',
+              iconType: 'medication',
+              title: `Time to take ${medication.name}`,
+              body: (schedule as any).dosage
+                ? `Take ${(schedule as any).dosage} of ${medication.name}`
+                : `Don't forget to take ${medication.name}`,
+              scheduledFor,
+              deliveryStatus: 'pending',
+            },
+          });
+        }),
+      );
+    }
 
     return ResponseHelper.success(
       userMedication,
@@ -53,7 +99,9 @@ export class UserMedicationService {
       'User medication created successfully',
     );
   }
-
+  /**
+   * Scan medication
+   */
   async scan(scanDto: ScanMedicationDto, userId: string) {
     const { scannedText, rawScannedData } = scanDto;
 
@@ -116,7 +164,7 @@ export class UserMedicationService {
       }
     }
 
-    // 2. Create ScanTask instead of UserMedication
+    // 2. Create ScanTask (Always)
     const scanTask = await this.prisma.medicationScanTask.create({
       data: {
         userId,
@@ -133,13 +181,29 @@ export class UserMedicationService {
       },
     });
 
+    // 3. If matched, also create UserMedication directly
+    if (matchedMedicationId) {
+      await this.prisma.userMedication.create({
+        data: {
+          userId,
+          medicationId: matchedMedicationId,
+          scannedData: scanTask.rawScannedData as Prisma.InputJsonValue,
+          isActive: true,
+        },
+      });
+    }
+
     return ResponseHelper.success(
       scanTask,
       matchedMedicationId ? 'MEDICATION.SCAN.SUCCESS' : 'MEDICATION.SCAN.FAILED',
-      matchedMedicationId ? 'Medication matched successfully' : 'No matching medication found',
+      matchedMedicationId
+        ? 'Medication matched and added successfully'
+        : 'No matching medication found',
     );
   }
-
+  /**
+   * Find all scan tasks
+   */
   async findAllScanTasks(userId: string) {
     const tasks = await this.prisma.medicationScanTask.findMany({
       where: { userId },
@@ -191,7 +255,9 @@ export class UserMedicationService {
       'User medications retrieved successfully',
     );
   }
-
+  /**
+   * Find one user medication
+   */
   async findOne(id: string, userId: string) {
     const userMedication = await this.prisma.userMedication.findFirst({
       where: { id, userId },
@@ -214,11 +280,16 @@ export class UserMedicationService {
       'User medication retrieved successfully',
     );
   }
-
+  /**
+   * Update user medication
+   */
   async update(id: string, userId: string, updateDto: UpdateUserMedicationDto) {
+    const { schedules, frequency, selectedDays, ...medicationData } = updateDto;
+
     // Verify ownership
     const existing = await this.prisma.userMedication.findFirst({
       where: { id, userId },
+      include: { reminderSchedules: true },
     });
 
     if (!existing) {
@@ -238,13 +309,63 @@ export class UserMedicationService {
       }
     }
 
-    const updated = await this.prisma.userMedication.update({
-      where: { id },
-      data: updateDto,
-      include: {
-        medication: true,
-        condition: true,
-      },
+    const cleanMedicationData = Object.fromEntries(
+      Object.entries(medicationData).filter(([, v]) => v !== undefined),
+    );
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      // 1. Update basic fields (only fields that were actually provided)
+      await tx.userMedication.update({
+        where: { id },
+        data: cleanMedicationData,
+      });
+
+      // 2. If schedules provided, replace them entirely
+      if (schedules) {
+        await tx.reminderSchedule.deleteMany({
+          where: { userMedicationId: id },
+        });
+
+        // Create new ones
+        if (schedules.length > 0) {
+          await tx.reminderSchedule.createMany({
+            data: schedules.map((s) => ({
+              userMedicationId: id,
+              remindTime: s.time,
+              dosage: s.doses.toString(),
+              repeatType:
+                frequency || (existing.reminderSchedules[0] as any)?.repeatType || 'daily',
+              repeatDays: selectedDays || (existing.reminderSchedules[0] as any)?.repeatDays || [],
+              isActive: updateDto.reminderEnabled ?? existing.reminderEnabled ?? true,
+            })),
+          });
+        }
+      } else {
+        // Build partial update for existing schedules
+        const scheduleUpdate: Record<string, any> = {};
+        if (frequency) scheduleUpdate.repeatType = frequency;
+        if (selectedDays) scheduleUpdate.repeatDays = selectedDays;
+        // If reminderEnabled changed, toggle isActive on all schedules
+        if (updateDto.reminderEnabled !== undefined) {
+          scheduleUpdate.isActive = updateDto.reminderEnabled;
+        }
+
+        if (Object.keys(scheduleUpdate).length > 0) {
+          await tx.reminderSchedule.updateMany({
+            where: { userMedicationId: id },
+            data: scheduleUpdate,
+          });
+        }
+      }
+
+      return tx.userMedication.findUnique({
+        where: { id },
+        include: {
+          medication: true,
+          condition: true,
+          reminderSchedules: true,
+        },
+      });
     });
 
     return ResponseHelper.success(
@@ -253,7 +374,9 @@ export class UserMedicationService {
       'User medication updated successfully',
     );
   }
-
+  /**
+   * Remove user medication
+   */
   async remove(id: string, userId: string) {
     const existing = await this.prisma.userMedication.findFirst({
       where: { id, userId },
@@ -277,5 +400,29 @@ export class UserMedicationService {
       MessageCodes.MEDICATION_DELETED,
       'User medication deleted successfully',
     );
+  }
+
+  /**
+   * Calculate the next datetime for a given "HH:mm" reminder time.
+   * If the time hasn't passed today, return today's date; otherwise tomorrow.
+   */
+  private getNextScheduledTime(remindTime: string | null): Date {
+    const now = new Date();
+
+    if (!remindTime) return now;
+
+    const [hourStr, minuteStr] = remindTime.split(':');
+    const hour = parseInt(hourStr, 10);
+    const minute = parseInt(minuteStr, 10);
+
+    const scheduled = new Date(now);
+    scheduled.setHours(hour, minute, 0, 0);
+
+    // If this moment has already passed today, schedule for tomorrow
+    if (scheduled <= now) {
+      scheduled.setDate(scheduled.getDate() + 1);
+    }
+
+    return scheduled;
   }
 }

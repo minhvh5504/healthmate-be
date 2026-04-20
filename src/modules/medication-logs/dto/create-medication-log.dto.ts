@@ -26,7 +26,7 @@ export class CreateMedicationLogDto {
   @ApiProperty({ description: 'Status (taken, missed, skipped)', enum: MedicationLogStatus })
   @IsEnum(MedicationLogStatus)
   @IsNotEmpty()
-  status: string;
+  status: MedicationLogStatus;
 
   @ApiPropertyOptional({ description: 'Time the medication was actually taken' })
   @IsDateString()

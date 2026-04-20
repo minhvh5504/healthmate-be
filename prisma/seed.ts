@@ -1,6 +1,9 @@
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
+import * as dotenv from 'dotenv';
+
+dotenv.config();
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -11,7 +14,7 @@ const prisma = new PrismaClient({ adapter });
 
 async function main() {
   console.log('🌱 Starting seed data for Healthmate...');
-  
+
   const timeSlots = [
     { slug: 'before_breakfast', displayName: 'Trước bữa sáng', defaultTime: '07:00' },
     { slug: 'after_breakfast', displayName: 'Sau bữa sáng', defaultTime: '08:00' },
@@ -28,6 +31,24 @@ async function main() {
       where: { slug: slot.slug },
       update: slot,
       create: slot,
+    });
+  }
+
+  const conditions = [
+    { slug: 'diabetes', displayName: 'Diabetes', iconEmoji: '💧', sortOrder: 1 },
+    { slug: 'angina', displayName: 'Angina', iconEmoji: '🔥', sortOrder: 2 },
+    { slug: 'high_cholesterol', displayName: 'High Cholesterol', iconEmoji: '🟡', sortOrder: 3 },
+    { slug: 'digestive_health', displayName: 'Digestive Health', iconEmoji: '🍎', sortOrder: 4 },
+    { slug: 'varicose_veins', displayName: 'Varicose Veins', iconEmoji: '🧍', sortOrder: 5 },
+    { slug: 'heart_failure', displayName: 'Heart Failure', iconEmoji: '💔', sortOrder: 6 },
+    { slug: 'hypertension', displayName: 'Hypertension', iconEmoji: '📊', sortOrder: 7 },
+  ];
+
+  for (const condition of conditions) {
+    await prisma.medicationCondition.upsert({
+      where: { slug: condition.slug },
+      update: condition,
+      create: condition,
     });
   }
 

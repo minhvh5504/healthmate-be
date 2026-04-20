@@ -1,5 +1,25 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsOptional, IsBoolean, IsInt, IsDateString } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsBoolean,
+  IsInt,
+  IsArray,
+  IsNumber,
+  ValidateNested,
+} from 'class-validator';
+import { Type } from 'class-transformer';
+
+export class ScheduleItemDto {
+  @ApiProperty({ description: 'Time string HH:mm' })
+  @IsString()
+  time: string;
+
+  @ApiProperty({ description: 'Number of doses at this time slot' })
+  @IsNumber()
+  doses: number;
+}
 
 export class CreateUserMedicationDto {
   @ApiProperty({ description: 'ID of the medication' })
@@ -43,13 +63,13 @@ export class CreateUserMedicationDto {
   isActive?: boolean;
 
   @ApiPropertyOptional({ description: 'Start date to take medication' })
-  @IsDateString()
   @IsOptional()
+  @Type(() => Date)
   startDate?: Date;
 
   @ApiPropertyOptional({ description: 'End date to take medication' })
-  @IsDateString()
   @IsOptional()
+  @Type(() => Date)
   endDate?: Date;
 
   @ApiPropertyOptional({ description: 'Number of items currently in stock' })
@@ -65,4 +85,30 @@ export class CreateUserMedicationDto {
   @ApiPropertyOptional({ description: 'Used to store extra info like OCR text' })
   @IsOptional()
   scannedData?: any;
+
+  @ApiPropertyOptional({ description: 'Enable low stock reminder' })
+  @IsBoolean()
+  @IsOptional()
+  lowStockReminderEnabled?: boolean;
+
+  @ApiPropertyOptional({ description: 'Frequency: daily, specific_days, as_needed' })
+  @IsString()
+  @IsOptional()
+  frequency?: string;
+
+  @ApiPropertyOptional({ description: 'Days of week to repeat (0-6 for Mon-Sun)' })
+  @IsArray()
+  @IsInt({ each: true })
+  @IsOptional()
+  selectedDays?: number[];
+
+  @ApiPropertyOptional({
+    description: 'List of time slots for taking medication',
+    type: [ScheduleItemDto],
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ScheduleItemDto)
+  schedules?: ScheduleItemDto[];
 }
