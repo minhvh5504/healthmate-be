@@ -151,11 +151,12 @@ model UserMedication {
   mealInstructionNote String?  @map("meal_instruction_note") @db.VarChar(80)
   conditionId         String?  @map("condition_id")
   conditionCustom     String?  @map("condition_custom") @db.VarChar(100)
-  reminderEnabled     Boolean  @default(true) @map("reminder_enabled")
-  startDate           DateTime? @map("start_date") @db.Date
-  endDate             DateTime? @map("end_date") @db.Date
-  stockCount          Int?     @map("stock_count")
-  lowStockThreshold   Int      @default(5) @map("low_stock_threshold")
+  reminderEnabled            Boolean   @default(true) @map("reminder_enabled")
+  lowStockReminderEnabled    Boolean   @default(true) @map("low_stock_reminder_enabled")
+  startDate                  DateTime? @map("start_date") @db.Date
+  endDate                    DateTime? @map("end_date") @db.Date
+  stockCount                 Int?      @map("stock_count")
+  lowStockThreshold          Int       @default(5) @map("low_stock_threshold")
   scannedData         Json?    @map("scanned_data")
   isActive            Boolean  @default(true) @map("is_active")
   createdAt           DateTime @default(now()) @map("created_at")
@@ -176,6 +177,7 @@ model ReminderSchedule {
   id               String   @id @default(uuid())
   userMedicationId String   @map("user_medication_id")
   remindTime       String?  @map("remind_time") @db.VarChar(8)
+  dosage           String?  @db.VarChar(50)
   repeatType       String   @default("daily") @map("repeat_type") @db.VarChar(20)
   repeatDays       Int[]    @map("repeat_days")
   repeatInterval   Int?     @map("repeat_interval")

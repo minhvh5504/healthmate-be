@@ -30,13 +30,13 @@ import { MedicationLogsModule } from './modules/medication-logs/medication-logs.
     }),
     ScheduleModule.forRoot(),
 
-    // Throttler for rate limiting
-    ThrottlerModule.forRoot([
-      {
-        ttl: 60000, // 1 minute
-        limit: 10, // 10 requests per minute
-      },
-    ]),
+    // // Throttler for rate limiting
+    // ThrottlerModule.forRoot([
+    //   {
+    //     ttl: 60000, // 1 minute
+    //     limit: 10, // 10 requests per minute
+    //   },
+    // ]),
 
     // Global modules
     PrismaModule,
@@ -65,10 +65,10 @@ import { MedicationLogsModule } from './modules/medication-logs/medication-logs.
       useClass: JwtAuthGuard,
     },
     // Global throttler guard for rate limiting
-    {
-      provide: APP_GUARD,
-      useClass: ThrottlerGuard,
-    },
+    // {
+    //   provide: APP_GUARD,
+    //   useClass: ThrottlerGuard,
+    // },
   ],
 })
 export class AppModule implements NestModule {
