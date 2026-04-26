@@ -136,6 +136,9 @@ export class AuthService {
         profile: {
           create: {
             fullName: this.generateDefaultFullName(),
+            heightCm: 0,
+            weightKg: 0,
+            bmi: 0,
           },
         },
         role: Role.user,
@@ -476,6 +479,9 @@ export class AuthService {
           profile: {
             create: {
               fullName: googleUser.name || this.generateDefaultFullName(),
+              heightCm: 0,
+              weightKg: 0,
+              bmi: 0,
             },
           },
           googleId: googleUser.googleId,

@@ -25,9 +25,7 @@ export class GoogleOAuthService implements OnModuleInit {
       ?.replace(/\\n/g, '\n');
 
     if (!projectId || !clientEmail || !privateKey) {
-      console.warn(
-        '⚠️  Firebase Admin credentials not configured. Google OAuth will not work.',
-      );
+      console.warn('⚠️  Firebase Admin credentials not configured. Google OAuth will not work.');
       return;
     }
 
@@ -53,8 +51,7 @@ export class GoogleOAuthService implements OnModuleInit {
       };
     } catch (error) {
       if (error instanceof ApiException) throw error;
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new ApiException(
         'AUTH.GOOGLE.VERIFICATION_FAILED',
         `Unable to verify Firebase ID token: ${errorMessage}`,

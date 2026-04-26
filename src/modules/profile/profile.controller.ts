@@ -34,4 +34,14 @@ export class ProfileController {
   updateProfile(@CurrentUser('id') userId: string, @Body() updateProfileDto: UpdateProfileDto) {
     return this.profileService.updateProfile(userId, updateProfileDto);
   }
+
+  @Get('health-analysis')
+  @Roles(Role.admin, Role.user)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Get BMI analysis compared to peers' })
+  @ApiResponse({ status: 200, description: 'Health analysis retrieved successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized or account deactivated' })
+  getHealthAnalysis(@CurrentUser('id') userId: string) {
+    return this.profileService.getHealthAnalysis(userId);
+  }
 }

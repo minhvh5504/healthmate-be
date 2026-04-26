@@ -1,10 +1,18 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, IsDateString } from 'class-validator';
+import { IsString, IsOptional, IsDate, IsEnum } from 'class-validator';
+import { Type } from 'class-transformer';
+import { MedicationLogStatus } from './create-medication-log.dto';
 
 export class UpdateMedicationLogDto {
-  @ApiPropertyOptional({ description: 'Update the time taken' })
-  @IsDateString()
+  @ApiPropertyOptional({ description: 'Update status', enum: MedicationLogStatus })
+  @IsEnum(MedicationLogStatus)
   @IsOptional()
+  status?: MedicationLogStatus;
+
+  @ApiPropertyOptional({ description: 'Update the time taken' })
+  @IsDate()
+  @IsOptional()
+  @Type(() => Date)
   takenAt?: Date;
 
   @ApiPropertyOptional({ description: 'Update the dosage taken' })

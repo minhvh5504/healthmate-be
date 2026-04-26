@@ -55,8 +55,44 @@ export class ProfileService {
       profile.bmiStatus = bmiStatus;
     }
 
+    // Fetch logs for health delta
+    const logs = await this.prisma.userHealthLog.findMany({
+      where: { userId },
+      orderBy: { recordedAt: 'desc' },
+      take: 2,
+    });
+
+    let healthDelta: {
+      weightKg: number;
+      heightCm: number;
+      daysSinceLastUpdate: number;
+    } | null = null;
+    if (logs.length === 2) {
+      const current = logs[0];
+      const previous = logs[1];
+
+      const diffTime = Math.abs(current.recordedAt.getTime() - previous.recordedAt.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      healthDelta = {
+        weightKg: Number(current.weightKg) - Number(previous.weightKg),
+        heightCm: Number(current.heightCm) - Number(previous.heightCm),
+        daysSinceLastUpdate: diffDays,
+      };
+    }
+
+    const result = {
+      ...userWithoutSensitiveData,
+      profile: profile
+        ? {
+            ...profile,
+            healthDelta,
+          }
+        : null,
+    };
+
     return ResponseHelper.success(
-      userWithoutSensitiveData,
+      result,
       MessageCodes.PROFILE_RETRIEVED,
       'Profile retrieved successfully',
       200,
@@ -116,27 +152,136 @@ export class ProfileService {
 
     const { bmi, bmiStatus } = this.calculateBMI(weightKg, heightCm);
 
-    const updatedProfile = await this.prisma.userProfile.upsert({
-      where: { userId },
-      create: {
-        userId,
-        ...restData,
-        bmi,
-        bmiStatus,
-        ...(dateOfBirth && { dateOfBirth }),
-      } as any,
-      update: {
-        ...restData,
-        bmi,
-        bmiStatus,
-        ...(dateOfBirth && { dateOfBirth }),
-      } as any,
+    const updatedProfile = await this.prisma.$transaction(async (tx) => {
+      const up = await tx.userProfile.upsert({
+        where: { userId },
+        create: {
+          userId,
+          ...restData,
+          bmi,
+          bmiStatus,
+          ...(dateOfBirth && { dateOfBirth }),
+        } as any,
+        update: {
+          ...restData,
+          bmi,
+          bmiStatus,
+          ...(dateOfBirth && { dateOfBirth }),
+        } as any,
+      });
+
+      // Insert into UserHealthLog if height or weight is provided
+      if (updateProfileDto.heightCm !== undefined || updateProfileDto.weightKg !== undefined) {
+        await tx.userHealthLog.create({
+          data: {
+            userId,
+            heightCm: heightCm !== null ? heightCm : undefined,
+            weightKg: weightKg !== null ? weightKg : undefined,
+            bmi,
+            bmiStatus,
+          },
+        });
+      }
+
+      return up;
     });
 
     return ResponseHelper.success(
       updatedProfile,
       MessageCodes.USER_UPDATED,
       'Profile updated successfully',
+      200,
+    );
+  }
+
+  /**
+   * Get health analysis (BMI comparison with peers)
+   */
+  async getHealthAnalysis(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { profile: true },
+    });
+
+    if (!user || !user.profile) {
+      throw new ApiException(
+        MessageCodes.USER_NOT_FOUND,
+        'User profile not found',
+        404,
+        'Health analysis failed',
+      );
+    }
+
+    const profile = user.profile as any;
+    const bmi = profile.bmi ? Number(profile.bmi) : null;
+
+    if (!bmi || !profile.dateOfBirth || !profile.gender) {
+      return ResponseHelper.success(
+        {
+          userBMI: bmi,
+          peerBMI: null,
+          percentage: null,
+          status: 'INCOMPLETE_DATA',
+        },
+        MessageCodes.PROFILE_RETRIEVED,
+        'Incomplete profile data for analysis',
+        200,
+      );
+    }
+
+    // Calculate age
+    const today = new Date();
+    const birthDate = new Date(profile.dateOfBirth);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+
+    // Find benchmark
+    const benchmark = await this.prisma.healthBenchmark.findFirst({
+      where: {
+        type: 'BMI',
+        gender: profile.gender,
+        ageMin: { lte: age },
+        ageMax: { gte: age },
+      },
+    });
+
+    if (!benchmark) {
+      return ResponseHelper.success(
+        {
+          userBMI: bmi,
+          peerBMI: null,
+          percentage: null,
+          status: 'NO_BENCHMARK_FOUND',
+        },
+        MessageCodes.PROFILE_RETRIEVED,
+        'No benchmark found for your age/gender',
+        200,
+      );
+    }
+
+    const peerBMI = Number(benchmark.value);
+    const diff = bmi - peerBMI;
+    const percentage = Math.abs((diff / peerBMI) * 100);
+
+    let status = 'NORMAL';
+    if (diff > 0.5) status = 'HIGHER';
+    if (diff < -0.5) status = 'LOWER';
+
+    const result = {
+      userBMI: parseFloat(bmi.toFixed(1)),
+      peerBMI: parseFloat(peerBMI.toFixed(1)),
+      percentage: parseFloat(percentage.toFixed(0)),
+      status,
+      peerDescription: benchmark.description,
+    };
+
+    return ResponseHelper.success(
+      result,
+      MessageCodes.PROFILE_RETRIEVED,
+      'Health analysis retrieved successfully',
       200,
     );
   }
@@ -155,13 +300,13 @@ export class ProfileService {
 
     let bmiStatus = '';
     if (bmi < 18.5) {
-      bmiStatus = 'Thiếu cân';
+      bmiStatus = 'UNDERWEIGHT';
     } else if (bmi < 25) {
-      bmiStatus = 'Cân đối';
+      bmiStatus = 'NORMAL';
     } else if (bmi < 30) {
-      bmiStatus = 'Thừa cân';
+      bmiStatus = 'OVERWEIGHT';
     } else {
-      bmiStatus = 'Béo phì';
+      bmiStatus = 'OBESE';
     }
 
     return { bmi, bmiStatus };
