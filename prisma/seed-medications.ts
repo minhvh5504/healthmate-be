@@ -51,7 +51,7 @@ async function main() {
     name: item.name,
     genericName: item.generic_name || null,
     form: item.form || null,
-    strength: item.strength || null,
+    dosage: item.strength || null,
     manufacturer: item.manufacturer || null,
     description: item.description || null,
     isVerified: item.is_verified || false,

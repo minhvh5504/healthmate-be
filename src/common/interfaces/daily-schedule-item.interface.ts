@@ -3,9 +3,11 @@ export interface DailyScheduleItem {
   reminderScheduleId: string;
   medicationName: string;
   dosage: string | null;
+  quantity: number;
   remindTime: string | null;
   mealInstruction: string | null;
   status: string;
   logId: string | null;
-  takenAt: Date | null;
+  actualAt: Date | null;
+  actualQuantity: number | null;
 }
