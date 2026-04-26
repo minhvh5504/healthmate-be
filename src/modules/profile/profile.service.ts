@@ -135,19 +135,18 @@ export class ProfileService {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { dateOfBirth: _dob, ...restData } = updateProfileDto;
 
-    // Calculate BMI using new values or existing ones
     const weightKg =
       updateProfileDto.weightKg !== undefined
         ? updateProfileDto.weightKg
-        : (user.profile as any)?.weightKg
-          ? Number((user.profile as any).weightKg)
+        : user.profile?.weightKg
+          ? Number(user.profile.weightKg)
           : null;
 
     const heightCm =
       updateProfileDto.heightCm !== undefined
         ? updateProfileDto.heightCm
-        : (user.profile as any)?.heightCm
-          ? Number((user.profile as any).heightCm)
+        : user.profile?.heightCm
+          ? Number(user.profile.heightCm)
           : null;
 
     const { bmi, bmiStatus } = this.calculateBMI(weightKg, heightCm);
@@ -212,7 +211,7 @@ export class ProfileService {
       );
     }
 
-    const profile = user.profile as any;
+    const profile = user.profile;
     const bmi = profile.bmi ? Number(profile.bmi) : null;
 
     if (!bmi || !profile.dateOfBirth || !profile.gender) {
@@ -231,7 +230,20 @@ export class ProfileService {
 
     // Calculate age
     const today = new Date();
-    const birthDate = new Date(profile.dateOfBirth);
+    const birthDate = profile.dateOfBirth;
+    if (!birthDate) {
+      return ResponseHelper.success(
+        {
+          userBMI: bmi,
+          peerBMI: null,
+          percentage: null,
+          status: 'INCOMPLETE_DATA',
+        },
+        MessageCodes.PROFILE_RETRIEVED,
+        'Incomplete profile data for analysis',
+        200,
+      );
+    }
     let age = today.getFullYear() - birthDate.getFullYear();
     const m = today.getMonth() - birthDate.getMonth();
     if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {

@@ -16,9 +16,9 @@ export class ScheduleItemDto {
   @IsString()
   time: string;
 
-  @ApiProperty({ description: 'Number of doses at this time slot' })
-  @IsNumber()
-  doses: number;
+  @ApiProperty({ description: 'Number of items/doses at this time slot' })
+  @IsInt()
+  quantity: number;
 }
 
 export class CreateUserMedicationDto {
@@ -36,11 +36,6 @@ export class CreateUserMedicationDto {
   @IsString()
   @IsOptional()
   mealInstruction?: string;
-
-  @ApiPropertyOptional({ description: 'Any extra notes about meal instructions' })
-  @IsString()
-  @IsOptional()
-  mealInstructionNote?: string;
 
   @ApiPropertyOptional({ description: 'ID of condition treated' })
   @IsString()

@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, IsDate, IsEnum } from 'class-validator';
+import { IsString, IsOptional, IsDate, IsEnum, IsInt } from 'class-validator';
 import { Type } from 'class-transformer';
 import { MedicationLogStatus } from './create-medication-log.dto';
 
@@ -13,15 +13,15 @@ export class UpdateMedicationLogDto {
   @IsDate()
   @IsOptional()
   @Type(() => Date)
-  takenAt?: Date;
+  actualAt?: Date;
 
-  @ApiPropertyOptional({ description: 'Update the dosage taken' })
+  @ApiPropertyOptional({ description: 'Update the quantity taken' })
+  @IsInt()
+  @IsOptional()
+  actualQuantity?: number;
+
+  @ApiPropertyOptional({ description: 'Update the meal instruction snapshot' })
   @IsString()
   @IsOptional()
-  dosageTaken?: string;
-
-  @ApiPropertyOptional({ description: 'Update notes' })
-  @IsString()
-  @IsOptional()
-  note?: string;
+  mealInstruction?: string;
 }

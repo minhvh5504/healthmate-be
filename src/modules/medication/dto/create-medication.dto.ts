@@ -23,13 +23,13 @@ export class CreateMedicationDto {
   form?: string;
 
   @ApiPropertyOptional({
-    description: 'The strength of the medication (e.g., 500mg)',
+    description: 'The dosage of the medication (e.g., 500mg)',
     maxLength: 50,
   })
   @IsOptional()
   @IsString()
   @MaxLength(50)
-  strength?: string;
+  dosage?: string;
 
   @ApiPropertyOptional({ description: 'The manufacturer of the medication', maxLength: 255 })
   @IsOptional()

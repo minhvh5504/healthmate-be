@@ -1,10 +1,12 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 import { CreateMedicationLogDto, MedicationLogStatus } from './dto/create-medication-log.dto';
 import { UpdateMedicationLogDto } from './dto/update-medication-log.dto';
 import { ResponseHelper } from '../../common/interfaces/api-response.interface';
 import { MessageCodes } from '../../common/constants/message-codes.const';
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
+import { getMealInstructionFromTime } from '../../common/utils/medication-helper';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class MedicationLogsService {
@@ -26,15 +28,25 @@ export class MedicationLogsService {
       );
     }
 
-    // 2. Set default takenAt if status is taken and not provided
+    // 2. Set default actualAt if status is taken and not provided
     const logData = { ...dto };
-    if (logData.status === MedicationLogStatus.TAKEN && !logData.takenAt) {
-      logData.takenAt = new Date();
+    if (logData.status === MedicationLogStatus.TAKEN && !logData.actualAt) {
+      logData.actualAt = new Date();
     }
 
-    // 3. Create log
+    // 3. Auto-calculate mealInstruction snapshot based on actualAt
+    if (logData.actualAt) {
+      const timeToCompare = new Date(logData.actualAt);
+      logData.mealInstruction =
+        logData.mealInstruction ||
+        getMealInstructionFromTime(timeToCompare.getHours(), timeToCompare.getMinutes());
+    }
+
+    // 4. Create log
     const log = await this.prisma.medicationLog.create({
-      data: logData,
+      data: {
+        ...logData,
+      },
     });
 
     return ResponseHelper.success(
@@ -47,7 +59,7 @@ export class MedicationLogsService {
   async findHistory(userId: string, userMedicationId?: string, range?: string, date?: string) {
     const referenceDate = date ? new Date(date) : new Date();
 
-    const whereClause: any = {
+    const whereClause: Prisma.MedicationLogWhereInput = {
       userMedication: {
         userId: userId,
       },
@@ -95,8 +107,19 @@ export class MedicationLogsService {
       orderBy: { createdAt: 'desc' },
     });
 
+    const logsWithNumericQuantity = logs.map((log) => ({
+      ...log,
+      actualQuantity: log.actualQuantity ? Number(log.actualQuantity) : null,
+      userMedication: log.userMedication
+        ? {
+            ...log.userMedication,
+            quantity: log.userMedication.quantity ? Number(log.userMedication.quantity) : null,
+          }
+        : null,
+    }));
+
     return ResponseHelper.success(
-      logs,
+      logsWithNumericQuantity,
       MessageCodes.MEDICATION_LOG_LIST_RETRIEVED,
       'Medication logs retrieved successfully',
     );

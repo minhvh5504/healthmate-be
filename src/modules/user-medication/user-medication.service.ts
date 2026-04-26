@@ -8,6 +8,7 @@ import { ResponseHelper } from '../../common/interfaces/api-response.interface';
 import { MessageCodes } from '../../common/constants/message-codes.const';
 import { Prisma } from '@prisma/client';
 import { DailyScheduleItem } from '../../common/interfaces/daily-schedule-item.interface';
+import { getMealInstructionFromTime } from '../../common/utils/medication-helper';
 
 @Injectable()
 export class UserMedicationService {
@@ -51,7 +52,8 @@ export class UserMedicationService {
             ? {
                 create: schedules.map((s) => ({
                   remindTime: s.time,
-                  dosage: s.doses.toString(),
+                  quantity: s.quantity,
+                  dosage: medicationData.dosage,
                   repeatType: frequency || 'daily',
                   repeatDays: selectedDays || [],
                 })),
@@ -78,8 +80,8 @@ export class UserMedicationService {
               channel: 'push',
               iconType: 'medication',
               title: `Time to take ${medication.name}`,
-              body: (schedule as any).dosage
-                ? `Take ${(schedule as any).dosage} of ${medication.name}`
+              body: schedule.dosage
+                ? `Take ${schedule.dosage} of ${medication.name}`
                 : `Don't forget to take ${medication.name}`,
               scheduledFor,
               deliveryStatus: 'pending',
@@ -245,8 +247,17 @@ export class UserMedicationService {
       orderBy: { createdAt: 'desc' },
     });
 
+    const formatted = userMedications.map((um) => ({
+      ...um,
+      quantity: um.quantity ? Number(um.quantity) : null,
+      reminderSchedules: um.reminderSchedules.map((s) => ({
+        ...s,
+        quantity: s.quantity ? Number(s.quantity) : null,
+      })),
+    }));
+
     return ResponseHelper.success(
-      userMedications,
+      formatted,
       MessageCodes.MEDICATION_LIST_RETRIEVED,
       'User medications retrieved successfully',
     );
@@ -312,29 +323,21 @@ export class UserMedicationService {
 
         if (!mealInstructionSlug && schedule.remindTime) {
           const [h, m] = schedule.remindTime.split(':').map(Number);
-          const minutes = h * 60 + m;
-
-          if (minutes <= 8 * 60) mealInstructionSlug = 'before_breakfast';
-          else if (minutes <= 10 * 60) mealInstructionSlug = 'after_breakfast';
-          else if (minutes <= 11 * 60 + 30) mealInstructionSlug = 'between_meals';
-          else if (minutes <= 12 * 60 + 30) mealInstructionSlug = 'before_lunch';
-          else if (minutes <= 14 * 60) mealInstructionSlug = 'after_lunch';
-          else if (minutes <= 17 * 60 + 30) mealInstructionSlug = 'between_meals';
-          else if (minutes <= 18 * 60 + 30) mealInstructionSlug = 'before_dinner';
-          else if (minutes <= 20 * 60) mealInstructionSlug = 'after_dinner';
-          else mealInstructionSlug = 'before_sleep';
+          mealInstructionSlug = getMealInstructionFromTime(h, m);
         }
 
-        const scheduleItem = {
+        const scheduleItem: DailyScheduleItem = {
           userMedicationId: um.id,
           reminderScheduleId: schedule.id,
           medicationName: um.medication.name,
           dosage: schedule.dosage,
+          quantity: schedule.quantity || 1,
           remindTime: schedule.remindTime,
           mealInstruction: mealInstructionSlug,
           status: log ? log.status : 'pending',
           logId: log ? log.id : null,
-          takenAt: log ? log.takenAt : null,
+          actualAt: log ? log.actualAt : null,
+          actualQuantity: log ? log.actualQuantity : null,
         };
 
         if (!schedule.remindTime) {
@@ -390,8 +393,17 @@ export class UserMedicationService {
       );
     }
 
+    const formatted = {
+      ...userMedication,
+      quantity: userMedication.quantity ? Number(userMedication.quantity) : null,
+      reminderSchedules: userMedication.reminderSchedules.map((s) => ({
+        ...s,
+        quantity: s.quantity ? Number(s.quantity) : null,
+      })),
+    };
+
     return ResponseHelper.success(
-      userMedication,
+      formatted,
       MessageCodes.MEDICATION_RETRIEVED,
       'User medication retrieved successfully',
     );
@@ -448,10 +460,10 @@ export class UserMedicationService {
             data: schedules.map((s) => ({
               userMedicationId: id,
               remindTime: s.time,
-              dosage: s.doses.toString(),
-              repeatType:
-                frequency || (existing.reminderSchedules[0] as any)?.repeatType || 'daily',
-              repeatDays: selectedDays || (existing.reminderSchedules[0] as any)?.repeatDays || [],
+              quantity: s.quantity,
+              dosage: updateDto.dosage || existing.dosage,
+              repeatType: frequency || existing.reminderSchedules[0]?.repeatType || 'daily',
+              repeatDays: selectedDays || existing.reminderSchedules[0]?.repeatDays || [],
               isActive: updateDto.reminderEnabled ?? existing.reminderEnabled ?? true,
             })),
           });
