@@ -1,9 +1,4 @@
-import {
-  ExceptionFilter,
-  Catch,
-  ArgumentsHost,
-  HttpException,
-} from '@nestjs/common';
+import { ExceptionFilter, Catch, ArgumentsHost, HttpException } from '@nestjs/common';
 import { Response } from 'express';
 import { ApiResponse } from '../interfaces/api-response.interface';
 
@@ -22,9 +17,7 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-function isHttpExceptionResponseObject(
-  value: unknown,
-): value is HttpExceptionResponseObject {
+function isHttpExceptionResponseObject(value: unknown): value is HttpExceptionResponseObject {
   if (!isObject(value)) return false;
 
   const msg = value.message;
@@ -42,9 +35,7 @@ function isHttpExceptionResponseObject(
 
 function isApiResponseLike(value: unknown): value is ApiResponseLike {
   return (
-    isObject(value) &&
-    typeof value.success === 'boolean' &&
-    typeof value.messageCode === 'string'
+    isObject(value) && typeof value.success === 'boolean' && typeof value.messageCode === 'string'
   );
 }
 

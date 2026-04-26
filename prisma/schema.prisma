@@ -32,6 +32,7 @@ model User {
   relationships      UserRelationship[] @relation("UserToRelationship")
   relatedRelationships UserRelationship[] @relation("RelatedUserToRelationship")
   scanTasks          MedicationScanTask[]
+  healthLogs         UserHealthLog[]
 
   @@index([email])
   @@index([googleId])
@@ -65,6 +66,21 @@ model UserProfile {
 
   @@index([userId])
   @@map("user_profiles")
+}
+
+model UserHealthLog {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  heightCm   Decimal? @map("height_cm") @db.Decimal(5, 2)
+  weightKg   Decimal? @map("weight_kg") @db.Decimal(5, 2)
+  bmi        Decimal? @db.Decimal(5, 2)
+  bmiStatus  String?  @map("bmi_status") @db.VarChar(50)
+  recordedAt DateTime @default(now()) @map("recorded_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, recordedAt])
+  @@map("user_health_logs")
 }
 
 model RefreshToken {
@@ -287,6 +303,21 @@ model MedicationScanTask {
 
   @@index([userId, status])
   @@map("medication_scan_tasks")
+}
+
+model HealthBenchmark {
+  id          String   @id @default(uuid())
+  type        String   @db.VarChar(30) // e.g., 'BMI', 'BLOOD_PRESSURE'
+  gender      Gender
+  ageMin      Int      @map("age_min")
+  ageMax      Int      @map("age_max")
+  value       Decimal  @db.Decimal(5, 2)
+  unit        String   @db.VarChar(20)
+  description String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@unique([type, gender, ageMin, ageMax])
+  @@map("health_benchmarks")
 }
 
 enum ScanStatus {

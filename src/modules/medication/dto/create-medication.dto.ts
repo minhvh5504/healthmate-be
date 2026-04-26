@@ -13,13 +13,19 @@ export class CreateMedicationDto {
   @MaxLength(255)
   genericName?: string;
 
-  @ApiPropertyOptional({ description: 'The form of the medication (e.g., tablet, capsule)', maxLength: 20 })
+  @ApiPropertyOptional({
+    description: 'The form of the medication (e.g., tablet, capsule)',
+    maxLength: 20,
+  })
   @IsOptional()
   @IsString()
   @MaxLength(20)
   form?: string;
 
-  @ApiPropertyOptional({ description: 'The strength of the medication (e.g., 500mg)', maxLength: 50 })
+  @ApiPropertyOptional({
+    description: 'The strength of the medication (e.g., 500mg)',
+    maxLength: 50,
+  })
   @IsOptional()
   @IsString()
   @MaxLength(50)

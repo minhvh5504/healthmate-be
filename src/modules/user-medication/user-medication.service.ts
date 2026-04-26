@@ -7,6 +7,7 @@ import { ScanMedicationDto } from './dto/scan-medication.dto';
 import { ResponseHelper } from '../../common/interfaces/api-response.interface';
 import { MessageCodes } from '../../common/constants/message-codes.const';
 import { Prisma } from '@prisma/client';
+import { DailyScheduleItem } from '../../common/interfaces/daily-schedule-item.interface';
 
 @Injectable()
 export class UserMedicationService {
@@ -20,7 +21,6 @@ export class UserMedicationService {
   async create(createUserMedicationDto: CreateUserMedicationDto, userId: string) {
     const { schedules, frequency, selectedDays, ...medicationData } = createUserMedicationDto;
 
-    // 1. Verify medication exists
     const medication = await this.prisma.medication.findUnique({
       where: { id: medicationData.medicationId },
     });
@@ -31,7 +31,6 @@ export class UserMedicationService {
       );
     }
 
-    // 2. Check condition if provided
     if (medicationData.conditionId) {
       const condition = await this.prisma.medicationCondition.findUnique({
         where: { id: medicationData.conditionId },
@@ -43,13 +42,11 @@ export class UserMedicationService {
       }
     }
 
-    // 3. Use transaction to create UserMedication + ReminderSchedules atomically
     const userMedication = await this.prisma.$transaction(async (tx) => {
       return tx.userMedication.create({
         data: {
           userId,
           ...medicationData,
-          // Nested create for each schedule slot sent from mobile
           reminderSchedules: schedules?.length
             ? {
                 create: schedules.map((s) => ({
@@ -69,7 +66,6 @@ export class UserMedicationService {
       });
     });
 
-    // 4. Create a pending Notification for each ReminderSchedule
     if (userMedication.reminderSchedules?.length) {
       await Promise.all(
         userMedication.reminderSchedules.map((schedule) => {
@@ -99,13 +95,13 @@ export class UserMedicationService {
       'User medication created successfully',
     );
   }
+
   /**
    * Scan medication
    */
   async scan(scanDto: ScanMedicationDto, userId: string) {
     const { scannedText, rawScannedData } = scanDto;
 
-    // Remove noise
     const cleanText = scannedText.trim().replace(/\n/g, ' ');
 
     // 1. Try to find existing medications
@@ -253,6 +249,126 @@ export class UserMedicationService {
       userMedications,
       MessageCodes.MEDICATION_LIST_RETRIEVED,
       'User medications retrieved successfully',
+    );
+  }
+  /**
+   * Get daily schedule
+   */
+  async getDailySchedule(userId: string, dateStr: string) {
+    const targetDate = new Date(dateStr);
+
+    if (isNaN(targetDate.getTime())) {
+      return ResponseHelper.error('INVALID_DATE', 'Invalid date format', 400);
+    }
+
+    const startOfDay = new Date(targetDate);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(targetDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const dayOfWeek = targetDate.getDay();
+
+    const userMedications = await this.prisma.userMedication.findMany({
+      where: { userId, isActive: true },
+      include: {
+        medication: true,
+        condition: true,
+        reminderSchedules: {
+          where: { isActive: true },
+        },
+      },
+    });
+
+    const dailyLogs = await this.prisma.medicationLog.findMany({
+      where: {
+        userMedication: { userId },
+        createdAt: {
+          gte: startOfDay,
+          lte: endOfDay,
+        },
+      },
+    });
+
+    const morning: DailyScheduleItem[] = [];
+    const afternoon: DailyScheduleItem[] = [];
+    const evening: DailyScheduleItem[] = [];
+
+    for (const um of userMedications) {
+      if (um.startDate && new Date(um.startDate) > endOfDay) continue;
+      if (um.endDate && new Date(um.endDate) < startOfDay) continue;
+
+      for (const schedule of um.reminderSchedules) {
+        const isDaily = schedule.repeatType === 'daily';
+        const isSpecificDays =
+          schedule.repeatType === 'specific_days' && schedule.repeatDays.includes(dayOfWeek);
+        const isAsNeeded = schedule.repeatType === 'as_needed';
+
+        if (!isDaily && !isSpecificDays && !isAsNeeded) continue;
+
+        const log = dailyLogs.find((l) => l.reminderScheduleId === schedule.id);
+
+        let mealInstructionSlug = um.mealInstruction;
+
+        if (!mealInstructionSlug && schedule.remindTime) {
+          const [h, m] = schedule.remindTime.split(':').map(Number);
+          const minutes = h * 60 + m;
+
+          if (minutes <= 8 * 60) mealInstructionSlug = 'before_breakfast';
+          else if (minutes <= 10 * 60) mealInstructionSlug = 'after_breakfast';
+          else if (minutes <= 11 * 60 + 30) mealInstructionSlug = 'between_meals';
+          else if (minutes <= 12 * 60 + 30) mealInstructionSlug = 'before_lunch';
+          else if (minutes <= 14 * 60) mealInstructionSlug = 'after_lunch';
+          else if (minutes <= 17 * 60 + 30) mealInstructionSlug = 'between_meals';
+          else if (minutes <= 18 * 60 + 30) mealInstructionSlug = 'before_dinner';
+          else if (minutes <= 20 * 60) mealInstructionSlug = 'after_dinner';
+          else mealInstructionSlug = 'before_sleep';
+        }
+
+        const scheduleItem = {
+          userMedicationId: um.id,
+          reminderScheduleId: schedule.id,
+          medicationName: um.medication.name,
+          dosage: schedule.dosage,
+          remindTime: schedule.remindTime,
+          mealInstruction: mealInstructionSlug,
+          status: log ? log.status : 'pending',
+          logId: log ? log.id : null,
+          takenAt: log ? log.takenAt : null,
+        };
+
+        if (!schedule.remindTime) {
+          morning.push(scheduleItem);
+          continue;
+        }
+
+        const [hourStr] = schedule.remindTime.split(':');
+        const hour = parseInt(hourStr, 10);
+
+        if (hour < 12) {
+          morning.push(scheduleItem);
+        } else if (hour < 18) {
+          afternoon.push(scheduleItem);
+        } else {
+          evening.push(scheduleItem);
+        }
+      }
+    }
+
+    const sortByTime = (a: DailyScheduleItem, b: DailyScheduleItem) => {
+      if (!a.remindTime) return -1;
+      if (!b.remindTime) return 1;
+      return a.remindTime.localeCompare(b.remindTime);
+    };
+
+    morning.sort(sortByTime);
+    afternoon.sort(sortByTime);
+    evening.sort(sortByTime);
+
+    return ResponseHelper.success(
+      { morning, afternoon, evening },
+      'DAILY_SCHEDULE_RETRIEVED',
+      'Daily schedule retrieved successfully',
     );
   }
   /**

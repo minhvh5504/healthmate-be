@@ -1,10 +1,10 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsOptional, IsEnum, IsDateString } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsEnum, IsDate } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export enum MedicationLogStatus {
   TAKEN = 'taken',
   MISSED = 'missed',
-  SKIPPED = 'skipped',
 }
 
 export class CreateMedicationLogDto {
@@ -23,14 +23,15 @@ export class CreateMedicationLogDto {
   @IsOptional()
   notificationId?: string;
 
-  @ApiProperty({ description: 'Status (taken, missed, skipped)', enum: MedicationLogStatus })
+  @ApiProperty({ description: 'Status (taken, missed)', enum: MedicationLogStatus })
   @IsEnum(MedicationLogStatus)
   @IsNotEmpty()
   status: MedicationLogStatus;
 
   @ApiPropertyOptional({ description: 'Time the medication was actually taken' })
-  @IsDateString()
+  @IsDate()
   @IsOptional()
+  @Type(() => Date)
   takenAt?: Date;
 
   @ApiPropertyOptional({ description: 'Dosage taken if different from default' })

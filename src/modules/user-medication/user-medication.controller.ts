@@ -10,6 +10,7 @@ import {
   Request,
   HttpCode,
   HttpStatus,
+  Query,
 } from '@nestjs/common';
 import { UserMedicationService } from './user-medication.service';
 import { CreateUserMedicationDto } from './dto/create-user-medication.dto';
@@ -69,6 +70,20 @@ export class UserMedicationController {
   @ApiResponse({ status: 200, description: 'Retrieved successfully' })
   findAll(@Request() req) {
     return this.userMedicationService.findAllByUser(req.user.id);
+  }
+
+  @Get('daily-schedule')
+  @Roles(Role.user, Role.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Get daily medication schedule for a specific date' })
+  @ApiResponse({ status: 200, description: 'Daily schedule retrieved successfully' })
+  getDailySchedule(@Query('date') date: string, @Request() req) {
+    if (!date) {
+      // default to today if not provided
+      const today = new Date();
+      date = today.toISOString().split('T')[0];
+    }
+    return this.userMedicationService.getDailySchedule(req.user.id, date);
   }
 
   @Get(':id')
