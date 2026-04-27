@@ -71,20 +71,22 @@ export class UserMedicationService {
     if (userMedication.reminderSchedules?.length) {
       await Promise.all(
         userMedication.reminderSchedules.map((schedule) => {
-          const scheduledFor = this.getNextScheduledTime(schedule.remindTime);
-          return this.prisma.notification.create({
-            data: {
-              userId,
+          // Tính thời gian uống thuốc
+          const medicationTime = this.getNextScheduledTime(schedule.remindTime);
+          // Nhắc trước 1 giờ
+          const scheduledFor = new Date(medicationTime.getTime() - 60 * 60 * 1000);
+
+          return this.notificationsService.createNotification({
+            userId,
+            type: 'medication_reminder',
+            title: `Medication Reminder: ${medication.name}`,
+            body: `You have a scheduled dose of ${schedule.dosage || ''} ${medication.name} in 1 hour.`,
+            scheduledFor,
+            iconType: 'medication',
+            fcmData: {
+              userMedicationId: userMedication.id,
               reminderScheduleId: schedule.id,
-              type: 'medication_reminder',
-              channel: 'push',
-              iconType: 'medication',
-              title: `Time to take ${medication.name}`,
-              body: schedule.dosage
-                ? `Take ${schedule.dosage} of ${medication.name}`
-                : `Don't forget to take ${medication.name}`,
-              scheduledFor,
-              deliveryStatus: 'pending',
+              type: 'REMINDER',
             },
           });
         }),

@@ -1,8 +1,22 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
-import { GetNotificationsDto } from './dto/get-notifications.dto';
+import { FcmService } from '../firebase/fcm.service';
+import { QueryNotificationDto } from './dto/query-notification.dto';
+import { CreateNotificationDto } from './dto/create-notification.dto';
 import { Prisma } from '@prisma/client';
+
+export interface CreateNotificationPayload {
+  userId: string;
+  type: string;
+  title: string;
+  body: string;
+  iconType?: string;
+  actionUrl?: string;
+  scheduledFor?: Date;
+  /** Extra key-value pairs forwarded to FCM data payload */
+  fcmData?: Record<string, string>;
+}
 
 @Injectable()
 export class NotificationsService {
@@ -11,15 +25,22 @@ export class NotificationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly realtimeGateway: RealtimeGateway,
+    private readonly fcmService: FcmService,
   ) {}
 
-  async findAll(userId: string, query: GetNotificationsDto) {
-    const { isRead, type, limit = 20, page = 1 } = query;
+  async findAll(userId: string, query: QueryNotificationDto) {
+    const { isRead, type, search, limit = 20, page = 1 } = query;
     const skip = (page - 1) * limit;
 
     const where: Prisma.NotificationWhereInput = { userId };
     if (isRead !== undefined) where.isRead = isRead;
     if (type) where.type = type;
+    if (search) {
+      where.OR = [
+        { title: { contains: search, mode: 'insensitive' } },
+        { body: { contains: search, mode: 'insensitive' } },
+      ];
+    }
 
     const [total, items] = await Promise.all([
       this.prisma.notification.count({ where }),
@@ -42,6 +63,13 @@ export class NotificationsService {
     };
   }
 
+  async getUnreadCount(userId: string) {
+    const count = await this.prisma.notification.count({
+      where: { userId, isRead: false },
+    });
+    return { unreadCount: count };
+  }
+
   async findOne(userId: string, id: string) {
     const notification = await this.prisma.notification.findFirst({
       where: { id, userId },
@@ -54,61 +82,234 @@ export class NotificationsService {
     return notification;
   }
 
-  async markAsRead(userId: string, id: string) {
-    return await this.prisma.notification.update({
-      where: { id, userId },
-      data: { isRead: true, readAt: new Date() },
-    });
-  }
+  async create(userId: string, dto: CreateNotificationDto) {
+    const targetUserId = dto.userId || userId;
 
-  async markAllAsRead(userId: string) {
-    return await this.prisma.notification.updateMany({
-      where: { userId, isRead: false },
-      data: { isRead: true, readAt: new Date() },
-    });
-  }
-
-  async remove(id: string, userId: string) {
-    return await this.prisma.notification.delete({
-      where: { id, userId },
-    });
-  }
-
-  async removeAll(userId: string) {
-    return await this.prisma.notification.deleteMany({
-      where: { userId },
-    });
-  }
-
-  /**
-   * Internal method to create and emit a notification
-   */
-  async createNotification(data: {
-    userId: string;
-    type: string;
-    title: string;
-    body: string;
-    iconType?: string;
-    actionUrl?: string;
-    scheduledFor?: Date;
-  }) {
     const notification = await this.prisma.notification.create({
       data: {
-        userId: data.userId,
-        type: data.type,
-        title: data.title,
-        body: data.body,
-        iconType: data.iconType || 'info',
-        actionUrl: data.actionUrl,
-        scheduledFor: data.scheduledFor || new Date(),
+        userId: targetUserId,
+        type: dto.type,
+        title: dto.title,
+        body: dto.body,
+        iconType: dto.iconType || 'info',
+        actionUrl: dto.actionUrl,
+        scheduledFor: dto.scheduledFor || new Date(),
         deliveryStatus: 'sent',
         sentAt: new Date(),
       },
     });
 
-    // Emit real-time notification
-    this.realtimeGateway.emitNotification(data.userId, notification);
+    // Emit real-time WebSocket notification (foreground)
+    this.realtimeGateway.emitNotificationToUser(
+      targetUserId,
+      notification as unknown as Record<string, unknown>,
+    );
+
+    // Update unread badge count via WebSocket
+    const unreadCount = await this.prisma.notification.count({
+      where: { userId: targetUserId, isRead: false },
+    });
+    this.realtimeGateway.emitUnreadCountToUser(targetUserId, unreadCount);
+
+    // Send FCM push notification (background / terminated) — fire & forget
+    void this.sendFcmToUserDevices(targetUserId, dto.title, dto.body);
 
     return notification;
+  }
+
+  async markAsRead(userId: string, id: string) {
+    const updated = await this.prisma.notification.update({
+      where: { id, userId },
+      data: { isRead: true, readAt: new Date() },
+    });
+
+    // Update badge count via WebSocket
+    await this.refreshUnreadBadge(userId);
+
+    return updated;
+  }
+
+  async markReadBulk(userId: string, ids?: string[], all?: boolean) {
+    const where: Prisma.NotificationUpdateManyArgs['where'] = { userId, isRead: false };
+
+    if (!all && ids && ids.length > 0) {
+      where.id = { in: ids };
+    } else if (!all && (!ids || ids.length === 0)) {
+      return { count: 0 };
+    }
+
+    const result = await this.prisma.notification.updateMany({
+      where,
+      data: { isRead: true, readAt: new Date() },
+    });
+
+    // Update badge count via WebSocket
+    await this.refreshUnreadBadge(userId);
+
+    return result;
+  }
+
+  /**
+   * Sends an already created notification that was pending
+   */
+  async sendExistingNotification(id: string) {
+    const notification = await this.prisma.notification.findUnique({
+      where: { id },
+    });
+
+    if (!notification || notification.deliveryStatus !== 'pending') {
+      return;
+    }
+
+    const now = new Date();
+
+    // 1. Update status to sent immediately to avoid double processing if possible
+    await this.prisma.notification.update({
+      where: { id },
+      data: {
+        deliveryStatus: 'sent',
+        sentAt: now,
+      },
+    });
+
+    // 2. Real-time WebSocket push (foreground)
+    this.realtimeGateway.emitNotificationToUser(
+      notification.userId,
+      notification as unknown as Record<string, unknown>,
+    );
+
+    // 3. FCM push (background / terminated) — fire & forget
+    void this.sendFcmToUserDevices(notification.userId, notification.title, notification.body);
+
+    // 4. Update badge count
+    await this.refreshUnreadBadge(notification.userId);
+  }
+
+  async remove(userId: string, id: string) {
+    const notification = await this.prisma.notification.findFirst({
+      where: { id, userId },
+    });
+
+    if (!notification) {
+      throw new NotFoundException('Notification not found');
+    }
+
+    return await this.prisma.notification.delete({ where: { id } });
+  }
+
+  async removeBulk(userId: string, ids?: string[], all?: boolean) {
+    const where: Prisma.NotificationDeleteManyArgs['where'] = { userId };
+
+    if (!all && ids && ids.length > 0) {
+      where.id = { in: ids };
+    } else if (!all && (!ids || ids.length === 0)) {
+      return { count: 0 };
+    }
+
+    return await this.prisma.notification.deleteMany({ where });
+  }
+
+  /**
+   * Internal method: create notification + emit WebSocket + send FCM push
+   * Used by ReminderSchedulesService and other internal services
+   */
+  async createNotification(payload: CreateNotificationPayload) {
+    const now = new Date();
+    const isFuture = payload.scheduledFor && payload.scheduledFor > now;
+
+    const notification = await this.prisma.notification.create({
+      data: {
+        userId: payload.userId,
+        type: payload.type,
+        title: payload.title,
+        body: payload.body,
+        iconType: payload.iconType ?? 'info',
+        actionUrl: payload.actionUrl,
+        scheduledFor: payload.scheduledFor ?? now,
+        deliveryStatus: isFuture ? 'pending' : 'sent',
+        sentAt: isFuture ? null : now,
+      },
+    });
+
+    // Chỉ gửi ngay nếu không phải là lịch hẹn trong tương lai
+    if (!isFuture) {
+      // Real-time WebSocket push (foreground)
+      this.realtimeGateway.emitNotificationToUser(
+        payload.userId,
+        notification as unknown as Record<string, unknown>,
+      );
+
+      // FCM push (background / terminated) — fire & forget
+      void this.sendFcmToUserDevices(payload.userId, payload.title, payload.body, payload.fcmData);
+    }
+
+    // Luôn cập nhật badge số thông báo chưa đọc
+    const unreadCount = await this.prisma.notification.count({
+      where: { userId: payload.userId, isRead: false },
+    });
+    this.realtimeGateway.emitUnreadCountToUser(payload.userId, unreadCount);
+
+    return notification;
+  }
+
+  async registerDeviceToken(userId: string, dto: { token: string; platform: string }) {
+    return await this.prisma.deviceToken.upsert({
+      where: { token: dto.token },
+      update: {
+        userId,
+        platform: dto.platform,
+        isActive: true,
+        lastUsedAt: new Date(),
+      },
+      create: {
+        userId,
+        token: dto.token,
+        platform: dto.platform,
+        isActive: true,
+      },
+    });
+  }
+
+  // ============================================
+  // PRIVATE HELPERS
+  // ============================================
+
+  /**
+   * Send FCM push to all registered devices of a user
+   */
+  private async sendFcmToUserDevices(
+    userId: string,
+    title: string,
+    body: string,
+    data?: Record<string, string>,
+  ) {
+    const devices = await this.prisma.deviceToken.findMany({
+      where: { userId, isActive: true },
+      select: { token: true },
+    });
+
+    if (!devices.length) return;
+
+    const tokens = devices.map((d) => d.token);
+
+    if (tokens.length === 1) {
+      await this.fcmService
+        .sendPush({ token: tokens[0], title, body, data })
+        .catch((err: unknown) => this.logger.error(`FCM send failed for user ${userId}`, err));
+    } else {
+      await this.fcmService
+        .sendMulticast(tokens, title, body, data)
+        .catch((err: unknown) => this.logger.error(`FCM multicast failed for user ${userId}`, err));
+    }
+  }
+
+  /**
+   * Refresh unread badge count for user via WebSocket
+   */
+  private async refreshUnreadBadge(userId: string) {
+    const unreadCount = await this.prisma.notification.count({
+      where: { userId, isRead: false },
+    });
+    this.realtimeGateway.emitUnreadCountToUser(userId, unreadCount);
   }
 }
