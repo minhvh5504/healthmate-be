@@ -20,6 +20,7 @@ import { UserRelationshipsModule } from './modules/user-relationships/user-relat
 import { MedicationConditionsModule } from './modules/medication-conditions/medication-conditions.module';
 import { ReminderSchedulesModule } from './modules/reminder-schedules/reminder-schedules.module';
 import { MedicationLogsModule } from './modules/medication-logs/medication-logs.module';
+import { FirebaseModule } from './modules/firebase/firebase.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { MedicationLogsModule } from './modules/medication-logs/medication-logs.
     // Global modules
     PrismaModule,
     RedisModule,
+    FirebaseModule,
 
     // Feature modules
     AuthModule,
