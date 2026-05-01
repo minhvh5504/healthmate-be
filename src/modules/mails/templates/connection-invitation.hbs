@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <style>
+      body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+      .container { max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f4f7f6; }
+      .header { background: linear-gradient(135deg, #4caf50 0%, #2e7d32 100%); color: white; padding: 40px 20px; text-align: center; border-radius: 10px 10px 0 0; }
+      .content { background: white; padding: 40px; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+      .inviter-card { background: #f9f9f9; padding: 20px; border-radius: 12px; margin: 25px 0; border: 1px solid #eee; text-align: center; }
+      .inviter-name { font-size: 20px; font-weight: bold; color: #2e7d32; }
+      .button { display: inline-block; padding: 16px 32px; background-color: #4caf50; color: white !important; text-decoration: none; border-radius: 30px; font-weight: bold; margin-top: 20px; box-shadow: 0 4px 10px rgba(76, 175, 80, 0.3); }
+      .footer { text-align: center; margin-top: 30px; font-size: 13px; color: #888; }
+      .app-name { font-weight: bold; color: #4caf50; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>🏥 Healthmate</h1>
+        <p>Family Connection Request</p>
+      </div>
+      <div class="content">
+        <h2>Hello! 👋</h2>
+        <p>Someone wants to connect with you on <span class="app-name">Healthmate</span> to help coordinate health reminders and medication tracking.</p>
+        
+        <div class="inviter-card">
+          <p>You have a new connection request from:</p>
+          <div class="inviter-name">{{inviterName}}</div>
+          <p style="font-size: 14px; color: #666;">({{inviterEmail}})</p>
+        </div>
+        
+        <p>By connecting, you'll be able to support each other in maintaining a healthy lifestyle and ensuring medications are taken on time.</p>
+        
+        <div style="text-align: center;">
+          <a href="{{acceptUrl}}" class="button">Accept Invitation</a>
+        </div>
+        
+        <p style="font-size: 12px; color: #999; margin-top: 30px; text-align: center;">
+          If the button above doesn't work, copy and paste this link into your browser:<br>
+          <span style="word-break: break-all; color: #4caf50;">{{acceptUrl}}</span>
+        </p>
+      </div>
+      <div class="footer">
+        <p>This is an automated invitation from Healthmate.</p>
+        <p>&copy; 2025 Healthmate App. All rights reserved.</p>
+      </div>
+    </div>
+  </body>
+</html>

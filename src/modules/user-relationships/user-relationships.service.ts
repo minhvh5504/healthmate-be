@@ -9,12 +9,18 @@ import { ResponseHelper } from '../../common/interfaces/api-response.interface';
 import { MessageCodes } from '../../common/constants/message-codes.const';
 import { InviteUserDto } from './dto/invite-user.dto';
 import { NotificationsService } from '../notifications/notifications.service';
+import { MailsService } from '../mails/mails.service';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class UserRelationshipsService {
   constructor(
     private prisma: PrismaService,
     private notificationsService: NotificationsService,
+    private mailsService: MailsService,
+    private jwtService: JwtService,
+    private configService: ConfigService,
   ) {}
 
   async invite(userId: string, inviteDto: InviteUserDto) {
@@ -23,11 +29,24 @@ export class UserRelationshipsService {
     // 1. Find user to invite
     const relatedUser = await this.prisma.user.findUnique({
       where: { email },
+      include: { profile: true },
     });
 
     if (!relatedUser) {
       throw new NotFoundException(
         ResponseHelper.error(MessageCodes.USER_NOT_FOUND, 'User to invite not found', 404),
+      );
+    }
+
+    // Get current user info for the email
+    const currentUser = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { profile: true },
+    });
+
+    if (!currentUser) {
+      throw new NotFoundException(
+        ResponseHelper.error(MessageCodes.USER_NOT_FOUND, 'Current user not found', 404),
       );
     }
 
@@ -91,12 +110,30 @@ export class UserRelationshipsService {
       userId: relatedUser.id,
       type: 'RELATIONSHIP_INVITE',
       title: 'New Connection Request',
-      body: `Someone wants to connect with you to help manage health reminders.`,
+      body: `${currentUser.profile?.fullName || currentUser.email} wants to connect with you.`,
       iconType: 'user_plus',
     });
 
+    // 5. Generate a secure token for one-click acceptance (valid for 24h)
+    const invitationToken = this.jwtService.sign(
+      { relationshipId: relationship.id, type: 'connection_invite' },
+      { expiresIn: '24h' },
+    );
+
+    // 6. Send invitation email with Deep Link + Token
+    void this.mailsService.sendConnectionInvitation({
+      toEmail: relatedUser.email,
+      inviterName: currentUser.profile?.fullName || 'Healthmate User',
+      inviterEmail: currentUser.email,
+      relationshipId: relationship.id,
+      token: invitationToken,
+    });
+
     return ResponseHelper.success(
-      relationship,
+      {
+        relationship,
+        invitationLink: `${this.configService.get('DEEP_LINK_URL')}?token=${invitationToken}`,
+      },
       MessageCodes.RELATIONSHIP_INVITED,
       'Invitation sent successfully',
     );
@@ -280,5 +317,69 @@ export class UserRelationshipsService {
     });
 
     return ResponseHelper.success(null, MessageCodes.RELATIONSHIP_DELETED, 'Relationship deleted');
+  }
+
+  async acceptByToken(token: string) {
+    try {
+      const payload = this.jwtService.verify<{
+        type: string;
+        relationshipId: string;
+      }>(token);
+
+      if (payload.type !== 'connection_invite' || !payload.relationshipId) {
+        throw new BadRequestException(
+          ResponseHelper.error('RELATIONSHIP.INVALID_TOKEN', 'Invalid invitation token', 400),
+        );
+      }
+
+      const relationship = await this.prisma.userRelationship.findUnique({
+        where: { id: payload.relationshipId },
+      });
+
+      if (!relationship) {
+        throw new NotFoundException(
+          ResponseHelper.error(MessageCodes.RELATIONSHIP_NOT_FOUND, 'Invitation not found', 404),
+        );
+      }
+
+      if (relationship.status !== 'pending') {
+        return ResponseHelper.success(
+          relationship,
+          MessageCodes.RELATIONSHIP_ALREADY_EXISTS,
+          'This invitation has already been processed',
+        );
+      }
+
+      const updated = await this.prisma.userRelationship.update({
+        where: { id: relationship.id },
+        data: {
+          status: 'accepted',
+          acceptedAt: new Date(),
+        },
+      });
+
+      // Notify the inviter
+      await this.notificationsService.createNotification({
+        userId: relationship.userId,
+        type: 'RELATIONSHIP_ACCEPTED',
+        title: 'Connection Request Accepted',
+        body: `Your connection request has been accepted via email.`,
+        iconType: 'user_check',
+      });
+
+      return ResponseHelper.success(
+        updated,
+        MessageCodes.RELATIONSHIP_ACCEPTED,
+        'Invitation accepted successfully',
+      );
+    } catch (e) {
+      const error = e as { name?: string };
+      if (error?.name === 'TokenExpiredError') {
+        throw new BadRequestException(
+          ResponseHelper.error('RELATIONSHIP.TOKEN_EXPIRED', 'Invitation link has expired', 400),
+        );
+      }
+      throw e;
+    }
   }
 }
