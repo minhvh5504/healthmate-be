@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { MailService } from './mail.service';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -26,8 +27,12 @@ export class MailsService {
   private readonly logger = new Logger(MailsService.name);
   private bookingConfirmationTemplate: HandlebarsTemplateDelegate;
   private queuePromotionTemplate: HandlebarsTemplateDelegate;
+  private connectionInvitationTemplate: HandlebarsTemplateDelegate;
 
-  constructor(private readonly mailService: MailService) {
+  constructor(
+    private readonly mailService: MailService,
+    private readonly configService: ConfigService,
+  ) {
     this.loadTemplates();
   }
 
@@ -47,6 +52,11 @@ export class MailsService {
       const queuePromotionPath = path.join(templatesDir, 'queue-promotion.hbs');
       const queuePromotionSource = fs.readFileSync(queuePromotionPath, 'utf-8');
       this.queuePromotionTemplate = Handlebars.compile(queuePromotionSource);
+
+      // Load connection invitation template
+      const connectionInvitationPath = path.join(templatesDir, 'connection-invitation.hbs');
+      const connectionInvitationSource = fs.readFileSync(connectionInvitationPath, 'utf-8');
+      this.connectionInvitationTemplate = Handlebars.compile(connectionInvitationSource);
 
       this.logger.log('Email templates loaded successfully');
     } catch (error) {
@@ -247,5 +257,36 @@ export class MailsService {
     };
 
     return statusMap[status] || 'pending';
+  }
+
+  /**
+   * Send connection invitation email
+   */
+  async sendConnectionInvitation(data: {
+    toEmail: string;
+    inviterName: string;
+    inviterEmail: string;
+    relationshipId: string;
+    token: string;
+  }): Promise<void> {
+    try {
+      // Point to backend endpoint which will then redirect to the app
+      const baseUrl = this.configService.get<string>('BASE_URL');
+      const acceptUrl = `${baseUrl}/api/user-relationships/accept-token?token=${data.token}`;
+
+      const html = this.connectionInvitationTemplate({
+        inviterName: data.inviterName,
+        inviterEmail: data.inviterEmail,
+        acceptUrl,
+      });
+
+      const subject = `🔗 Connection Request from ${data.inviterName} - Healthmate`;
+
+      await this.mailService.sendMail(data.toEmail, subject, html);
+
+      this.logger.log(`Connection invitation email sent to ${data.toEmail}`);
+    } catch (error) {
+      this.logger.error('Failed to send connection invitation email:', error);
+    }
   }
 }
