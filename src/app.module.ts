@@ -21,6 +21,7 @@ import { MedicationConditionsModule } from './modules/medication-conditions/medi
 import { ReminderSchedulesModule } from './modules/reminder-schedules/reminder-schedules.module';
 import { MedicationLogsModule } from './modules/medication-logs/medication-logs.module';
 import { FirebaseModule } from './modules/firebase/firebase.module';
+import { StatisticsModule } from './modules/statistics/statistics.module';
 
 @Module({
   imports: [
@@ -59,6 +60,7 @@ import { FirebaseModule } from './modules/firebase/firebase.module';
     MedicationConditionsModule,
     ReminderSchedulesModule,
     MedicationLogsModule,
+    StatisticsModule,
   ],
   providers: [
     // Global guard - apply JWT auth to all routes by default
