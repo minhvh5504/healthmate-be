@@ -10,10 +10,10 @@ import { RealtimeModule } from './modules/realtime/realtime.module';
 import { UploadModule } from './modules/upload/upload.module';
 import { NotificationTimeSlotsModule } from './modules/notification-time-slots/notification-time-slots.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
-import { CleanupService } from './common/services/cleanup.service';
 import { ProfileModule } from './modules/profile/profile.module';
 import { MedicationModule } from './modules/medication/medication.module';
 import { RedisModule } from './modules/redis/redis.module';
+import { UserMedicationModule } from './modules/user-medication/user-medication.module';
 
 @Module({
   imports: [
@@ -44,6 +44,7 @@ import { RedisModule } from './modules/redis/redis.module';
     NotificationTimeSlotsModule,
     ProfileModule,
     MedicationModule,
+    UserMedicationModule,
   ],
   providers: [
     // Global guard - apply JWT auth to all routes by default
@@ -56,11 +57,10 @@ import { RedisModule } from './modules/redis/redis.module';
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
     },
-    CleanupService,
   ],
 })
 export class AppModule implements NestModule {
-  configure(consumer: MiddlewareConsumer) {
+  configure(_consumer: MiddlewareConsumer) {
     // Apply anti-fake middleware to order creation endpoint
     // consumer.apply(AntiFakeMiddleware).forRoutes('orders');
   }

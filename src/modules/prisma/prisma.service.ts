@@ -3,9 +3,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
 
 @Injectable()
-export class PrismaService
-  extends PrismaClient
-  implements OnModuleInit, OnModuleDestroy {
+export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   constructor() {
     const adapter = new PrismaPg({
       connectionString: process.env.DATABASE_URL,
@@ -29,8 +27,7 @@ export class PrismaService
     }
 
     const models = Reflect.ownKeys(this).filter(
-      (key) =>
-        typeof key === 'string' && key[0] !== '_' && key !== 'constructor',
+      (key) => typeof key === 'string' && key[0] !== '_' && key !== 'constructor',
     ) as string[];
 
     await Promise.all(
