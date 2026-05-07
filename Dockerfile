@@ -22,6 +22,8 @@ WORKDIR /app
 
 # Copy production node_modules from deps stage
 COPY --from=deps /app/node_modules ./node_modules
+# Copy generated Prisma Client
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 # Copy built dist and prisma from builder stage
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
