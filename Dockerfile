@@ -1,44 +1,33 @@
-# Build stage
+# Stage 1: Base & Dependencies
+FROM node:20-alpine AS deps
+WORKDIR /app
+COPY package.json yarn.lock ./
+# Install only production dependencies
+RUN yarn install --frozen-lockfile --production && yarn cache clean
+
+# Stage 2: Builder (Full environment)
 FROM node:20-alpine AS builder
-
-# Set working directory
 WORKDIR /app
-
-# Copy package files
 COPY package.json yarn.lock ./
-
-# Install dependencies
+# Install ALL dependencies (including devDependencies)
 RUN yarn install --frozen-lockfile
-
-# Copy source code
 COPY . .
+RUN yarn prisma:generate && yarn build
 
-# Generate Prisma Client
-RUN yarn prisma:generate
-
-# Build application
-RUN yarn build
-
-# Production stage
+# Stage 3: Production
 FROM node:20-alpine AS production
-
-# Set working directory
+RUN apk add --no-cache dumb-init
+ENV NODE_ENV=production
 WORKDIR /app
 
-# Copy package files
-COPY package.json yarn.lock ./
-
-# Install production dependencies only
-RUN yarn install --frozen-lockfile
-
-# Copy built application from builder
+# Copy production node_modules from deps stage
+COPY --from=deps /app/node_modules ./node_modules
+# Copy built dist and prisma from builder stage
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
+COPY package.json ./
 
-# Expose port
 EXPOSE 8080
-
-# Start application
+ENTRYPOINT ["dumb-init", "--"]
 CMD ["node", "dist/src/main.js"]
