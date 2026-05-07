@@ -27,8 +27,9 @@ jobs:
             git pull origin production
 
             echo "🐳 Rebuilding containers..."
-            docker compose -p healthmate down
-            docker compose -p healthmate up -d --build
+            docker compose down
+            docker compose up -d --build
+            docker logs -f healthmate_backend_v2
 
             echo "🧹 Pruning unused images..."
             docker image prune -f
