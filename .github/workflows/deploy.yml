@@ -29,7 +29,6 @@ jobs:
             echo "🐳 Rebuilding containers..."
             docker compose down
             docker compose up -d --build
-            docker logs -f healthmate_backend_v2
 
             echo "🧹 Pruning unused images..."
             docker image prune -f
