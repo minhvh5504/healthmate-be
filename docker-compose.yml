@@ -4,14 +4,14 @@ services:
   # PostgreSQL Database
   postgres:
     image: postgres:16-alpine
-    container_name: healthmate_postgres
+    container_name: healthmate_postgres_v2
     restart: unless-stopped
     environment:
       POSTGRES_USER: healthmate_user
       POSTGRES_PASSWORD: healthmate_password_2026
       POSTGRES_DB: healthmate_db
     ports:
-      - '5432:5432'
+      - '5433:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -22,14 +22,13 @@ services:
       timeout: 5s
       retries: 5
 
-
   # Additional Redis
   healthmate-redis:
     image: redis:7-alpine
-    container_name: healthmate_redis
+    container_name: healthmate_redis_v2
     restart: unless-stopped
     ports:
-      - '6381:6379'
+      - '6382:6379'
     volumes:
       - healthmate_redis_data:/data
     networks:
@@ -44,46 +43,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: healthmate_backend
+    container_name: healthmate_backend_v2
     restart: unless-stopped
-    environment:
-      # Database
-      DATABASE_URL: postgresql://healthmate_user:healthmate_password_2026@postgres:5432/healthmate_db
-
-      # JWT Secrets
-      JWT_SECRET: healthmate_dev_jwt_secret_key_2026_change_in_production
-      JWT_EXPIRES_IN: 1d
-      JWT_REFRESH_SECRET: healthmate_dev_jwt_refresh_secret_key_2026_change_in_production
-      JWT_REFRESH_EXPIRES_IN: 7d
-
-      # Application
-      PORT: 8080
-      NODE_ENV: development
-      FRONTEND_URL: http://localhost:3000
-
-      # Redis Configuration
-      REDIS_HOST: healthmate-redis
-      REDIS_PORT: 6379
-      HEALTHMATE_REDIS_HOST: healthmate-redis
-      HEALTHMATE_REDIS_PORT: 6379
-
-      # Email Configuration
-      MAIL_HOST: smtp.gmail.com
-      MAIL_PORT: 587
-      MAIL_USER: minhlucius3@gmail.com
-      MAIL_PASSWORD: dpnehawzaulwrmon
-      MAIL_FROM: Healthmate <minhlucius3@gmail.com>
-
-      # Cloudinary Configuration
-      CLOUDINARY_CLOUD_NAME: dasiiuipv
-      CLOUDINARY_API_KEY: 336458563188567
-      CLOUDINARY_API_SECRET: amPPlX9D-4Azyt9vEcnmelQG6os
-      CLOUDIARY_FOLDER: healthmate
-
-      # Firebase/Google Configuration
-      FIREBASE_PROJECT_ID: health-mate-c3907
-      FIREBASE_CLIENT_EMAIL: firebase-adminsdk-fbsvc@health-mate-c3907.iam.gserviceaccount.com
-      # Private key handled via volume or secret is better, but keeping simple for dev
+    env_file:
+      - .env
     ports:
       - '8080:8080'
     depends_on:
