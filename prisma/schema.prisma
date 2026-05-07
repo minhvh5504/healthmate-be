@@ -33,6 +33,7 @@ model User {
   relatedRelationships UserRelationship[] @relation("RelatedUserToRelationship")
   scanTasks          MedicationScanTask[]
   healthLogs         UserHealthLog[]
+  aiMessages         AiMessage[]
 
   @@index([email])
   @@index([googleId])
@@ -319,6 +320,19 @@ model HealthBenchmark {
 
   @@unique([type, gender, ageMin, ageMax])
   @@map("health_benchmarks")
+}
+
+model AiMessage {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  role      String   @db.VarChar(20) // 'user', 'assistant'
+  content   String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("ai_messages")
 }
 
 enum ScanStatus {
