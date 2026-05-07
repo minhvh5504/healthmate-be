@@ -1,5 +1,16 @@
 import { Roles } from 'src/common/decorators/roles.decorator';
-import { Controller, Get, Body, Patch, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Body,
+  Patch,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+  Query,
+  Param,
+  Delete,
+} from '@nestjs/common';
 import { ProfileService } from './profile.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
@@ -43,5 +54,52 @@ export class ProfileController {
   @ApiResponse({ status: 401, description: 'Unauthorized or account deactivated' })
   getHealthAnalysis(@CurrentUser('id') userId: string) {
     return this.profileService.getHealthAnalysis(userId);
+  }
+
+  @Get('admin/all')
+  @Roles(Role.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '[ADMIN] Get all users with pagination' })
+  @ApiResponse({ status: 200, description: 'User list retrieved successfully' })
+  findAllAdmin(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('status') status?: 'active' | 'inactive' | 'all',
+  ) {
+    return this.profileService.findAllAdmin(
+      page ? Number(page) : 1,
+      limit ? Number(limit) : 10,
+      status,
+    );
+  }
+
+  @Get('admin/:id')
+  @Roles(Role.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '[ADMIN] Get specific user details' })
+  @ApiResponse({ status: 200, description: 'User details retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  findOneAdmin(@Param('id') id: string) {
+    return this.profileService.findOneAdmin(id);
+  }
+
+  @Patch('admin/:id/status')
+  @Roles(Role.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '[ADMIN] Toggle user active status' })
+  @ApiResponse({ status: 200, description: 'User status updated successfully' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  toggleUserStatus(@Param('id') id: string) {
+    return this.profileService.toggleUserStatus(id);
+  }
+
+  @Delete('admin/:id')
+  @Roles(Role.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '[ADMIN] Delete user account' })
+  @ApiResponse({ status: 200, description: 'User deleted successfully' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  deleteUser(@Param('id') id: string) {
+    return this.profileService.deleteUser(id);
   }
 }

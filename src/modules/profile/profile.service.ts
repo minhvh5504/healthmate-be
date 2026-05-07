@@ -299,6 +299,139 @@ export class ProfileService {
   }
 
   /**
+   * [ADMIN] Get all users with pagination and filtering
+   */
+  async findAllAdmin(page = 1, limit = 10, status?: 'active' | 'inactive' | 'all') {
+    const skip = (page - 1) * limit;
+
+    const where: any = {};
+    if (status === 'active') where.isActive = true;
+    if (status === 'inactive') where.isActive = false;
+
+    const [users, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        skip,
+        take: limit,
+        include: { profile: true },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+
+    const result = users.map((user) => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { password, failedLoginAttempts, lockedUntil, ...userData } = user;
+      return userData;
+    });
+
+    return ResponseHelper.success(
+      {
+        users: result,
+        total,
+        page,
+        limit,
+      },
+      MessageCodes.USER_LIST_RETRIEVED,
+      'User list retrieved successfully',
+      200,
+    );
+  }
+
+  /**
+   * [ADMIN] Get specific user details
+   */
+  async findOneAdmin(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        profile: true,
+        userMedications: {
+          include: { medication: true },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new ApiException(
+        MessageCodes.USER_NOT_FOUND,
+        'User not found',
+        404,
+        'User retrieval failed',
+      );
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password, failedLoginAttempts, lockedUntil, ...userData } = user;
+
+    return ResponseHelper.success(
+      userData,
+      MessageCodes.USER_RETRIEVED,
+      'User details retrieved successfully',
+      200,
+    );
+  }
+
+  /**
+   * [ADMIN] Toggle user active status
+   */
+  async toggleUserStatus(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new ApiException(
+        MessageCodes.USER_NOT_FOUND,
+        'User not found',
+        404,
+        'Status toggle failed',
+      );
+    }
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: { isActive: !user.isActive },
+    });
+
+    return ResponseHelper.success(
+      { isActive: updatedUser.isActive },
+      MessageCodes.USER_UPDATED,
+      `User ${updatedUser.isActive ? 'activated' : 'deactivated'} successfully`,
+      200,
+    );
+  }
+
+  /**
+   * [ADMIN] Delete user account
+   */
+  async deleteUser(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new ApiException(
+        MessageCodes.USER_NOT_FOUND,
+        'User not found',
+        404,
+        'User deletion failed',
+      );
+    }
+
+    await this.prisma.user.delete({
+      where: { id: userId },
+    });
+
+    return ResponseHelper.success(
+      null,
+      MessageCodes.USER_DELETED,
+      'User deleted successfully',
+      200,
+    );
+  }
+
+  /**
    * Helper to calculate BMI and status
    */
   private calculateBMI(weightKg: number | null, heightCm: number | null) {

@@ -3,7 +3,7 @@ import { extname } from 'path';
 import { promises as fs } from 'fs';
 import * as streamifier from 'streamifier';
 import { v2 as CloudinaryType } from 'cloudinary';
-import { CLOUDINARY } from 'src/providers/cloudinary.provider';
+import { CLOUDINARY } from 'src/common/providers/cloudinary.provider';
 import { ResponseHelper } from '../../common/interfaces/api-response.interface';
 import { MessageCodes } from '../../common/constants/message-codes.const';
 import { ApiException } from '../../common/exceptions/api.exception';

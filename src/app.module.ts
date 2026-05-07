@@ -22,6 +22,7 @@ import { ReminderSchedulesModule } from './modules/reminder-schedules/reminder-s
 import { MedicationLogsModule } from './modules/medication-logs/medication-logs.module';
 import { FirebaseModule } from './modules/firebase/firebase.module';
 import { StatisticsModule } from './modules/statistics/statistics.module';
+import { AiModule } from './modules/ai/ai.module';
 
 @Module({
   imports: [
@@ -61,6 +62,7 @@ import { StatisticsModule } from './modules/statistics/statistics.module';
     ReminderSchedulesModule,
     MedicationLogsModule,
     StatisticsModule,
+    AiModule,
   ],
   providers: [
     // Global guard - apply JWT auth to all routes by default
