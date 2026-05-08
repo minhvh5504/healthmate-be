@@ -3,7 +3,7 @@ import { IsEmail, IsString, Length } from 'class-validator';
 
 export class AdminVerifyEmailDto {
   @ApiProperty({
-    example: 'admin@healthmate.com',
+    example: 'admin@healthmate.dev',
     description: 'Admin email address',
   })
   @IsEmail({}, { message: 'Invalid email format' })

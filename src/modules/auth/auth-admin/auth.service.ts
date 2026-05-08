@@ -3,7 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
-import { MailService } from '../../mails/mail.service';
+import { MailService } from '../../mails/mails.service';
 import { AdminLoginDto } from './dto/login.dto';
 import { AdminRegisterDto } from './dto/register.dto';
 import { AdminRefreshTokenDto } from './dto/refresh-token.dto';

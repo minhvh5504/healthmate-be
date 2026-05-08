@@ -9,7 +9,7 @@ import { ResponseHelper } from '../../common/interfaces/api-response.interface';
 import { MessageCodes } from '../../common/constants/message-codes.const';
 import { InviteUserDto } from './dto/invite-user.dto';
 import { NotificationsService } from '../notifications/notifications.service';
-import { MailsService } from '../mails/mails.service';
+import { MailService } from '../mails/mails.service';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 
@@ -18,7 +18,7 @@ export class UserRelationshipsService {
   constructor(
     private prisma: PrismaService,
     private notificationsService: NotificationsService,
-    private mailsService: MailsService,
+    private mailService: MailService,
     private jwtService: JwtService,
     private configService: ConfigService,
   ) {}
@@ -121,7 +121,7 @@ export class UserRelationshipsService {
     );
 
     // 6. Send invitation email with Deep Link + Token
-    void this.mailsService.sendConnectionInvitation({
+    void this.mailService.sendConnectionInvitation({
       toEmail: relatedUser.email,
       inviterName: currentUser.profile?.fullName || 'Healthmate User',
       inviterEmail: currentUser.email,
