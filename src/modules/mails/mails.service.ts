@@ -1,262 +1,123 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { MailService } from './mail.service';
+import { Resend } from 'resend';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as Handlebars from 'handlebars';
 
-interface BookingEmailData {
-  bookingId: string;
-  patientName: string;
-  patientEmail: string;
-  doctorName: string;
-  serviceName: string;
-  bookingDate: string;
-  startTime: string;
-  endTime: string;
-  duration: number;
-  status: string;
-  price?: number;
-  patientNotes?: string;
-  queuePosition?: number;
-  estimatedWaitTime?: number;
-}
-
 @Injectable()
-export class MailsService {
-  private readonly logger = new Logger(MailsService.name);
-  private bookingConfirmationTemplate: HandlebarsTemplateDelegate;
-  private queuePromotionTemplate: HandlebarsTemplateDelegate;
-  private connectionInvitationTemplate: HandlebarsTemplateDelegate;
+export class MailService {
+  private readonly logger = new Logger(MailService.name);
+  private resend: Resend | null = null;
+  private mailFrom: string;
+  private templates: Record<string, HandlebarsTemplateDelegate> = {};
 
-  constructor(
-    private readonly mailService: MailService,
-    private readonly configService: ConfigService,
-  ) {
+  constructor(private configService: ConfigService) {
+    this.initializeResend();
     this.loadTemplates();
+  }
+
+  private initializeResend() {
+    const apiKey = this.configService.get<string>('RESEND_API_KEY');
+    this.mailFrom = this.configService.get<string>('MAIL_FROM') || 'noreply@healthmate.dev';
+
+    if (!apiKey) {
+      this.logger.warn('RESEND_API_KEY not found. Emails will be logged to console only.');
+      return;
+    }
+
+    this.resend = new Resend(apiKey);
+    this.logger.log('Resend email service initialized');
   }
 
   /**
    * Load and compile Handlebars templates
    */
   private loadTemplates() {
+    const templatesToLoad = [
+      'verification-email',
+      'welcome-email',
+      'otp-email',
+      'forgot-password-email',
+      'connection-invitation',
+    ];
+
     try {
       const templatesDir = path.join(__dirname, 'templates');
 
-      // Load booking confirmation template
-      const bookingConfirmationPath = path.join(templatesDir, 'booking-confirmation.hbs');
-      const bookingConfirmationSource = fs.readFileSync(bookingConfirmationPath, 'utf-8');
-      this.bookingConfirmationTemplate = Handlebars.compile(bookingConfirmationSource);
-
-      // Load queue promotion template
-      const queuePromotionPath = path.join(templatesDir, 'queue-promotion.hbs');
-      const queuePromotionSource = fs.readFileSync(queuePromotionPath, 'utf-8');
-      this.queuePromotionTemplate = Handlebars.compile(queuePromotionSource);
-
-      // Load connection invitation template
-      const connectionInvitationPath = path.join(templatesDir, 'connection-invitation.hbs');
-      const connectionInvitationSource = fs.readFileSync(connectionInvitationPath, 'utf-8');
-      this.connectionInvitationTemplate = Handlebars.compile(connectionInvitationSource);
-
-      this.logger.log('Email templates loaded successfully');
+      for (const templateName of templatesToLoad) {
+        const templatePath = path.join(templatesDir, `${templateName}.hbs`);
+        if (fs.existsSync(templatePath)) {
+          const source = fs.readFileSync(templatePath, 'utf-8');
+          this.templates[templateName] = Handlebars.compile(source);
+        } else {
+          this.logger.warn(`Template not found: ${templatePath}`);
+        }
+      }
+      this.logger.log('MailService templates loaded successfully');
     } catch (error) {
       this.logger.error('Failed to load email templates:', error);
-      this.logger.warn('Email notifications will not be sent with custom templates');
     }
   }
 
   /**
-   * Send booking confirmation email
+   * Send verification email with OTP code
    */
-  async sendBookingConfirmation(data: BookingEmailData): Promise<void> {
-    try {
-      const isQueued = data.status === 'QUEUED';
-      const isPending = data.status === 'PENDING';
+  async sendVerificationEmail(email: string, fullName: string, code: string): Promise<void> {
+    const subject = 'Verify Your Email - Healthmate';
 
-      const html = this.bookingConfirmationTemplate({
-        ...data,
-        isQueued,
-        isPending,
-        statusClass: this.getStatusClass(data.status),
-      });
-
-      const subject = isQueued
-        ? '⏳ Your Booking is in Queue - Healthmate'
-        : isPending
-          ? '📅 Booking Scheduled - Healthmate'
-          : '✅ Booking Confirmed - Healthmate';
-
-      await this.mailService.sendMail(data.patientEmail, subject, html);
-
-      this.logger.log(`Booking confirmation email sent to ${data.patientEmail}`);
-    } catch (error) {
-      this.logger.error('Failed to send booking confirmation email:', error);
+    if (!this.templates['verification-email']) {
+      this.logger.error('Verification email template not loaded');
+      return;
     }
+
+    const html = this.templates['verification-email']({ fullName, code });
+    await this.sendMail(email, subject, html, fullName, code);
   }
 
   /**
-   * Send queue promotion notification
+   * Send welcome email after verification
    */
-  async sendQueuePromotion(data: BookingEmailData): Promise<void> {
-    try {
-      const html = this.queuePromotionTemplate(data);
+  async sendWelcomeEmail(email: string, fullName: string): Promise<void> {
+    const subject = 'Welcome to Healthmate! 🎉';
 
-      const subject = '🎉 Your Appointment is Confirmed! - Healthmate';
-
-      await this.mailService.sendMail(data.patientEmail, subject, html);
-
-      this.logger.log(`Queue promotion email sent to ${data.patientEmail}`);
-    } catch (error) {
-      this.logger.error('Failed to send queue promotion email:', error);
+    if (!this.templates['welcome-email']) {
+      this.logger.error('Welcome email template not loaded');
+      return;
     }
+
+    const html = this.templates['welcome-email']({ fullName });
+    await this.sendMail(email, subject, html, fullName);
   }
 
   /**
-   * Send booking cancellation notification
+   * Send OTP email for registration (email-only flow)
    */
-  async sendBookingCancellation(data: BookingEmailData): Promise<void> {
-    try {
-      const html = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <style>
-              body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-              .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-              .header { background: #dc3545; color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-              .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
-              .booking-card { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; }
-              .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #888; }
-            </style>
-          </head>
-          <body>
-            <div class="container">
-              <div class="header">
-                <h1>🏥 Healthmate</h1>
-                <p>Booking Cancellation</p>
-              </div>
-              <div class="content">
-                <h2>Hello ${data.patientName},</h2>
-                <p>Your appointment has been cancelled.</p>
-                
-                <div class="booking-card">
-                  <h3>📋 Cancelled Booking Details</h3>
-                  <p><strong>Booking ID:</strong> ${data.bookingId}</p>
-                  <p><strong>Doctor:</strong> ${data.doctorName}</p>
-                  <p><strong>Service:</strong> ${data.serviceName}</p>
-                  <p><strong>Date:</strong> ${data.bookingDate}</p>
-                  <p><strong>Time:</strong> ${data.startTime} - ${data.endTime}</p>
-                </div>
-                
-                <p>If you did not request this cancellation or have any questions, please contact us immediately.</p>
-                <p>We hope to serve you again soon!</p>
-                
-                <p>Best regards,<br>Healthmate Team</p>
-              </div>
-              <div class="footer">
-                <p>This is an automated email. Please do not reply.</p>
-                <p>&copy; 2025 Healthmate. All rights reserved.</p>
-              </div>
-            </div>
-          </body>
-        </html>
-      `;
+  async sendOtpEmail(email: string, code: string): Promise<void> {
+    const subject = 'Mã xác thực đăng ký - Healthmate';
 
-      const subject = '❌ Booking Cancelled - Healthmate';
-
-      await this.mailService.sendMail(data.patientEmail, subject, html);
-
-      this.logger.log(`Booking cancellation email sent to ${data.patientEmail}`);
-    } catch (error) {
-      this.logger.error('Failed to send booking cancellation email:', error);
+    if (!this.templates['otp-email']) {
+      this.logger.error('OTP email template not loaded');
+      return;
     }
+
+    const html = this.templates['otp-email']({ code });
+    await this.sendMail(email, subject, html, undefined, code);
   }
 
   /**
-   * Send booking reminder (24 hours before)
+   * Send forgot password email with OTP code
    */
-  async sendBookingReminder(data: BookingEmailData): Promise<void> {
-    try {
-      const html = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <style>
-              body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-              .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-              .header { background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-              .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
-              .booking-card { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; }
-              .alert { background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; }
-              .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #888; }
-            </style>
-          </head>
-          <body>
-            <div class="container">
-              <div class="header">
-                <h1>🏥 Healthmate</h1>
-                <p>Appointment Reminder</p>
-              </div>
-              <div class="content">
-                <h2>Hello ${data.patientName}! 👋</h2>
-                <p><strong>This is a friendly reminder about your upcoming appointment tomorrow.</strong></p>
-                
-                <div class="booking-card">
-                  <h3>📋 Appointment Details</h3>
-                  <p><strong>Doctor:</strong> ${data.doctorName}</p>
-                  <p><strong>Service:</strong> ${data.serviceName}</p>
-                  <p><strong>Date:</strong> ${data.bookingDate}</p>
-                  <p><strong>Time:</strong> ${data.startTime} - ${data.endTime}</p>
-                </div>
-                
-                <div class="alert">
-                  <strong>📌 Please Remember:</strong>
-                  <ul>
-                    <li>Arrive 10 minutes early</li>
-                    <li>Bring your ID and medical documents</li>
-                    <li>If you need to cancel, please do so ASAP</li>
-                  </ul>
-                </div>
-                
-                <p>We look forward to seeing you!</p>
-                
-                <p>Best regards,<br>Healthmate Team</p>
-              </div>
-              <div class="footer">
-                <p>This is an automated email. Please do not reply.</p>
-                <p>&copy; 2025 Healthmate. All rights reserved.</p>
-              </div>
-            </div>
-          </body>
-        </html>
-      `;
+  async sendForgotPasswordEmail(email: string, fullName: string, code: string): Promise<void> {
+    const subject = 'Quên mật khẩu - Healthmate';
 
-      const subject = '⏰ Appointment Reminder - Tomorrow - Healthmate';
-
-      await this.mailService.sendMail(data.patientEmail, subject, html);
-
-      this.logger.log(`Booking reminder email sent to ${data.patientEmail}`);
-    } catch (error) {
-      this.logger.error('Failed to send booking reminder email:', error);
+    if (!this.templates['forgot-password-email']) {
+      this.logger.error('Forgot password email template not loaded');
+      return;
     }
-  }
 
-  /**
-   * Get status CSS class
-   */
-  private getStatusClass(status: string): string {
-    const statusMap: Record<string, string> = {
-      PENDING: 'pending',
-      CONFIRMED: 'confirmed',
-      QUEUED: 'queued',
-      CHECKED_IN: 'confirmed',
-      IN_PROGRESS: 'confirmed',
-      COMPLETED: 'confirmed',
-      CANCELLED: 'pending',
-      NO_SHOW: 'pending',
-    };
-
-    return statusMap[status] || 'pending';
+    const html = this.templates['forgot-password-email']({ fullName, code });
+    await this.sendMail(email, subject, html, fullName, code);
   }
 
   /**
@@ -269,12 +130,16 @@ export class MailsService {
     relationshipId: string;
     token: string;
   }): Promise<void> {
+    if (!this.templates['connection-invitation']) {
+      this.logger.error('Connection invitation template not loaded');
+      return;
+    }
+
     try {
-      // Point to backend endpoint which will then redirect to the app
       const baseUrl = this.configService.get<string>('BASE_URL');
       const acceptUrl = `${baseUrl}/api/user-relationships/accept-token?token=${data.token}`;
 
-      const html = this.connectionInvitationTemplate({
+      const html = this.templates['connection-invitation']({
         inviterName: data.inviterName,
         inviterEmail: data.inviterEmail,
         acceptUrl,
@@ -282,11 +147,53 @@ export class MailsService {
 
       const subject = `🔗 Connection Request from ${data.inviterName} - Healthmate`;
 
-      await this.mailService.sendMail(data.toEmail, subject, html);
-
-      this.logger.log(`Connection invitation email sent to ${data.toEmail}`);
+      await this.sendMail(data.toEmail, subject, html);
     } catch (error) {
       this.logger.error('Failed to send connection invitation email:', error);
+    }
+  }
+
+  // Core method
+  async sendMail(
+    to: string,
+    subject: string,
+    html: string,
+    fullName?: string,
+    code?: string,
+  ): Promise<void> {
+    if (!this.resend) {
+      this.logger.log(`
+        📧 EMAIL (Console Mode)
+        To: ${to}
+        Subject: ${subject}
+        ${fullName ? `Name: ${fullName}` : ''}
+        ${code ? `OTP Code: ${code}` : ''}
+      `);
+      return;
+    }
+
+    try {
+      const { error } = await this.resend.emails.send({
+        from: this.mailFrom,
+        to,
+        subject,
+        html,
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      this.logger.log(`Email sent successfully to ${to}`);
+    } catch (error) {
+      this.logger.error('Failed to send email:', error);
+      this.logger.log(`
+        📧 EMAIL (Fallback Mode)
+        To: ${to}
+        Subject: ${subject}
+        ${fullName ? `Name: ${fullName}` : ''}
+        ${code ? `OTP Code: ${code}` : ''}
+      `);
     }
   }
 }
