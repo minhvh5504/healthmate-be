@@ -3,7 +3,7 @@ import { IsEmail, IsString } from 'class-validator';
 
 export class AdminResendOtpDto {
   @ApiProperty({
-    example: 'admin@healthmate.com',
+    example: 'admin@healthmate.dev',
     description: 'Email address to resend OTP',
   })
   @IsEmail({}, { message: 'Invalid email address' })
