@@ -3,19 +3,15 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
-import { MailService } from '../../mails/mails.service';
 import { AdminLoginDto } from './dto/login.dto';
 import { AdminRegisterDto } from './dto/register.dto';
 import { AdminRefreshTokenDto } from './dto/refresh-token.dto';
-import { AdminVerifyEmailDto } from './dto/verify-email.dto';
-import { AdminResendOtpDto } from './dto/resend-otp.dto';
-import { Role /*, VerificationType */ } from '@prisma/client';
+import { Role } from '@prisma/client';
 import { ResponseHelper } from '../../../common/interfaces/api-response.interface';
 import { MessageCodes } from '../../../common/constants/message-codes.const';
 import { ApiException } from '../../../common/exceptions/api.exception';
 import * as ms from 'ms';
 import type { StringValue } from 'ms';
-import { RedisService, OtpType } from '../../redis/redis.service';
 
 export interface TokenPair {
   accessToken: string;
@@ -25,6 +21,7 @@ export interface TokenPair {
 interface JwtPayload {
   sub: string;
   email: string | null;
+  username: string | null;
   role: Role;
 }
 
@@ -34,28 +31,7 @@ export class AuthAdminService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
-    private readonly mailService: MailService,
-    private readonly redisService: RedisService,
   ) {}
-
-  /**
-   * Generate 6-digit OTP code
-   */
-  private generateOtpCode(): string {
-    return Math.floor(100000 + Math.random() * 900000).toString();
-  }
-
-  /**
-   * Create verification code record
-   */
-  private async createVerificationCode(userId: string, type: OtpType): Promise<string> {
-    const code = this.generateOtpCode();
-
-    // Store in Redis with 5 minutes expiration (300 seconds)
-    await this.redisService.setOtp(userId, code, type, 300);
-
-    return code;
-  }
 
   /**
    * Generate access and refresh tokens
@@ -63,9 +39,10 @@ export class AuthAdminService {
   private async generateTokenPair(
     userId: string,
     email: string | null,
+    username: string | null,
     role: Role,
   ): Promise<TokenPair> {
-    const payload: JwtPayload = { sub: userId, email, role };
+    const payload: JwtPayload = { sub: userId, email, username, role };
 
     // Generate access token
     const accessToken = this.jwtService.sign(payload, {
@@ -107,17 +84,17 @@ export class AuthAdminService {
    * Register a new admin with email
    */
   async register(registerDto: AdminRegisterDto) {
-    const { email, password } = registerDto;
+    const { username, password } = registerDto;
 
-    // Check if email already exists
+    // Check if username already exists
     const existingUser = await this.prisma.user.findUnique({
-      where: { email },
+      where: { username },
     });
 
     if (existingUser) {
       throw new ApiException(
-        MessageCodes.EMAIL_ALREADY_EXISTS,
-        'Email already registered',
+        MessageCodes.USER_ALREADY_EXISTS,
+        'Username already registered',
         409,
         'Register failed',
       );
@@ -126,10 +103,10 @@ export class AuthAdminService {
     // Hash password
     const hashedPassword = await this.hashPassword(password);
 
-    // Create user with emailVerified = false and Role.admin
+    // Create user with usernameVerified = true and Role.admin
     const user = await this.prisma.user.create({
       data: {
-        email,
+        username,
         password: hashedPassword,
         profile: {
           create: {
@@ -137,7 +114,6 @@ export class AuthAdminService {
           },
         },
         role: Role.admin,
-        emailVerified: false,
         isActive: true,
       },
       include: {
@@ -145,132 +121,20 @@ export class AuthAdminService {
       },
     });
 
-    // Generate OTP code
-    const otpCode = await this.createVerificationCode(user.id, OtpType.EMAIL_VERIFICATION);
-
-    // Send OTP via email
-    await this.mailService.sendOtpEmail(email, otpCode);
-
-    return ResponseHelper.success(
-      { email },
-      MessageCodes.REGISTER_SUCCESS,
-      'Admin registered successfully! Please check your email to verify your account.',
-      201,
-    );
-  }
-
-  /**
-   * Verify account/email with OTP code
-   */
-  async verifyOtp(verifyOtpDto: AdminVerifyEmailDto) {
-    const { email, code } = verifyOtpDto;
-
-    // Find user
-    const user = await this.prisma.user.findUnique({
-      where: { email },
-      include: { profile: true },
-    });
-
-    if (!user) {
-      throw new ApiException(
-        MessageCodes.USER_NOT_FOUND,
-        'User not found',
-        404,
-        'Verification failed',
-      );
-    }
-
-    if (!user.isActive) {
-      throw new ApiException(
-        MessageCodes.ACCOUNT_DISABLED,
-        'Your account has been deactivated/blocked. Please contact admin to unlock your account.',
-        401,
-        'Verification failed',
-      );
-    }
-
-    // Get code from Redis
-    const storedCode = await this.redisService.getOtp(user.id, OtpType.EMAIL_VERIFICATION);
-
-    if (!storedCode || storedCode !== code) {
-      throw new ApiException(
-        MessageCodes.INVALID_OTP,
-        'Invalid or expired verification code',
-        400,
-        'Verification failed',
-      );
-    }
-
-    await this.prisma.$transaction([
-      this.prisma.user.update({
-        where: { id: user.id },
-        data: { emailVerified: true },
-      }),
-    ]);
-
-    // Delete OTP after use
-    await this.redisService.deleteOtp(user.id, OtpType.EMAIL_VERIFICATION);
-
-    // Send welcome email
-    if (user.email) {
-      await this.mailService.sendWelcomeEmail(user.email, user.profile?.fullName ?? '');
-    }
-
     // Generate tokens
-    const tokens = await this.generateTokenPair(user.id, user.email, user.role);
+    const tokens = await this.generateTokenPair(user.id, user.email, user.username, user.role);
 
-    const { password: _password, ...userWithoutPassword } = user;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password: _, ...userWithoutPassword } = user;
 
     return ResponseHelper.success(
       {
-        user: { ...userWithoutPassword, emailVerified: true },
+        user: userWithoutPassword,
         ...tokens,
       },
-      MessageCodes.VERIFY_SUCCESS,
-      'Email verified successfully!',
-      200,
-    );
-  }
-
-  /**
-   * Resend OTP code
-   */
-  async resendOtp(resendOtpDto: AdminResendOtpDto) {
-    const { email } = resendOtpDto;
-
-    const user = await this.prisma.user.findUnique({
-      include: { profile: true },
-      where: { email },
-    });
-
-    if (!user) {
-      throw new ApiException(
-        MessageCodes.USER_NOT_FOUND,
-        'User not found',
-        404,
-        'Resend OTP failed',
-      );
-    }
-
-    if (user.emailVerified) {
-      throw new ApiException(
-        'AUTH.VERIFY.ALREADY_VERIFIED',
-        'Email already verified',
-        400,
-        'Resend OTP failed',
-      );
-    }
-
-    // Generate new OTP code and store in Redis
-    const otpCode = await this.createVerificationCode(user.id, OtpType.EMAIL_VERIFICATION);
-
-    await this.mailService.sendOtpEmail(email, otpCode);
-
-    return ResponseHelper.success(
-      { email },
-      MessageCodes.RESEND_OTP_SUCCESS,
-      'OTP code has been resent to your email!',
-      200,
+      MessageCodes.REGISTER_SUCCESS,
+      'Admin registered successfully!',
+      201,
     );
   }
 
@@ -278,18 +142,18 @@ export class AuthAdminService {
    * Login admin with email
    */
   async login(loginDto: AdminLoginDto) {
-    const { email, password } = loginDto;
+    const { username, password } = loginDto;
 
-    // Find user by email and check if it's an admin
+    // Find user by username and check if it's an admin
     const user = await this.prisma.user.findFirst({
-      where: { email },
+      where: { username },
       include: { profile: true },
     });
 
     if (!user) {
       throw new ApiException(
         MessageCodes.INVALID_CREDENTIALS,
-        'Email or password is incorrect',
+        'Username or password is incorrect',
         401,
         'Login failed',
       );
@@ -305,33 +169,24 @@ export class AuthAdminService {
       );
     }
 
-    // Check if email is verified
-    if (!user.emailVerified) {
-      throw new ApiException(
-        MessageCodes.ACCOUNT_NOT_VERIFIED,
-        'Please verify your email address first',
-        401,
-        'Login failed',
-      );
-    }
-
     // Verify password
     const isPasswordValid = await this.comparePasswords(password, user.password || '');
 
     if (!isPasswordValid) {
       throw new ApiException(
         MessageCodes.INVALID_CREDENTIALS,
-        'Email or password is incorrect',
+        'Username or password is incorrect',
         401,
         'Login failed',
       );
     }
 
     // Generate tokens
-    const tokens = await this.generateTokenPair(user.id, user.email, user.role);
+    const tokens = await this.generateTokenPair(user.id, user.email, user.username, user.role);
 
     // Remove password from response
-    const { password: _password, ...userWithoutPassword } = user;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password: _, ...userWithoutPassword } = user;
 
     return ResponseHelper.success(
       {
@@ -405,6 +260,7 @@ export class AuthAdminService {
       const tokens = await this.generateTokenPair(
         payload.sub,
         payload.email,
+        payload.username,
         storedToken.user.role,
       );
 

@@ -3,7 +3,7 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export class ChangePasswordDto {
   @ApiProperty({
-    example: 'OldPassword123!',
+    example: 'OldPassword123@',
     description: 'Current password of the user',
   })
   @IsString({ message: 'Current password must be a string' })
@@ -11,7 +11,7 @@ export class ChangePasswordDto {
   currentPassword: string;
 
   @ApiProperty({
-    example: 'NewPassword123!',
+    example: 'NewPassword123@',
     description: 'New password (min 6, max 50 characters)',
   })
   @IsString()
