@@ -28,7 +28,7 @@ export class MedicationService {
   }
 
   /**
-   * Get all medications
+   * Get all medications (Legacy)
    */
   async findAll() {
     const medications = await this.prisma.medication.findMany({
@@ -38,6 +38,42 @@ export class MedicationService {
       medications,
       MessageCodes.MEDICATION_LIST_RETRIEVED,
       'All medications retrieved successfully',
+    );
+  }
+
+  /**
+   * [Admin] Get all medications with pagination and search
+   */
+  async findAllAdmin(page = 1, limit = 10, search?: string) {
+    const skip = (page - 1) * limit;
+
+    const where: any = {};
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { genericName: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    const [medications, total] = await Promise.all([
+      this.prisma.medication.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.medication.count({ where }),
+    ]);
+
+    return ResponseHelper.success(
+      {
+        medications,
+        total,
+        page,
+        limit,
+      },
+      MessageCodes.MEDICATION_LIST_RETRIEVED,
+      'Admin medications retrieved successfully',
     );
   }
 
