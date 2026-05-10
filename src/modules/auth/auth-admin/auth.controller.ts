@@ -4,8 +4,6 @@ import { AuthAdminService } from './auth.service';
 import { AdminLoginDto } from './dto/login.dto';
 import { AdminRegisterDto } from './dto/register.dto';
 import { AdminRefreshTokenDto } from './dto/refresh-token.dto';
-import { AdminVerifyEmailDto } from './dto/verify-email.dto';
-import { AdminResendOtpDto } from './dto/resend-otp.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { Public } from '../../../common/decorators/public.decorator';
 import { Role } from '@prisma/client';
@@ -21,58 +19,24 @@ export class AuthAdminController {
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
-    summary: '[Admin] Register a new with email - Sends OTP to email',
+    summary: '[Admin] Register a new admin with username - Returns tokens immediately',
   })
   @ApiResponse({
     status: 201,
-    description: 'Registration successful, OTP sent to email',
+    description: 'Registration successful, returns tokens',
   })
   @ApiResponse({
     status: 409,
-    description: 'Email already registered',
+    description: 'Username already registered',
   })
   async register(@Body() registerDto: AdminRegisterDto) {
     return this.authAdminService.register(registerDto);
   }
 
   @Public()
-  @Post('verify-email')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: '[Admin] Verify account with OTP code',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Email verified successfully, returns tokens',
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Invalid or expired OTP',
-  })
-  async verifyEmail(@Body() verifyEmailDto: AdminVerifyEmailDto) {
-    return this.authAdminService.verifyOtp(verifyEmailDto);
-  }
-
-  @Public()
-  @Post('resend-otp')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: '[Admin] Resend OTP verification code to email' })
-  @ApiResponse({
-    status: 200,
-    description: 'OTP sent successfully',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Admin not found',
-  })
-  async resendOtp(@Body() resendOtpDto: AdminResendOtpDto) {
-    return this.authAdminService.resendOtp(resendOtpDto);
-  }
-
-  @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: '[Admin] Login with email' })
+  @ApiOperation({ summary: '[Admin] Login with username' })
   @ApiResponse({
     status: 200,
     description: 'Login successful, returns access and refresh tokens',
