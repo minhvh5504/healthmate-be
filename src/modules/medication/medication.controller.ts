@@ -42,10 +42,26 @@ export class MedicationController {
   @Get()
   @Roles(Role.admin, Role.user)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Get all medications' })
+  @ApiOperation({ summary: 'Get all medications (Legacy/Mobile)' })
   @ApiResponse({ status: 200, description: 'Medications retrieved successfully' })
   findAll() {
     return this.medicationService.findAll();
+  }
+
+  @Get('admin/all')
+  @Roles(Role.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '[Admin] Get all medications with pagination and search' })
+  @ApiResponse({ status: 200, description: 'Medications retrieved successfully' })
+  findAllAdmin(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('q') search?: string,
+  ) {
+    const pageNum = page ? parseInt(page, 10) : 1;
+    const limitNum = limit ? parseInt(limit, 10) : 10;
+
+    return this.medicationService.findAllAdmin(pageNum, limitNum, search);
   }
 
   @Get('search')
