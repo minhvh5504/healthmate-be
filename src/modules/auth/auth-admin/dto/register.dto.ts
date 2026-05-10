@@ -3,11 +3,13 @@ import { IsEmail, IsString, MaxLength, MinLength } from 'class-validator';
 
 export class AdminRegisterDto {
   @ApiProperty({
-    example: 'admin@example.com',
-    description: 'Email address of the admin',
+    example: 'admin123',
+    description: 'Username of the admin',
   })
-  @IsEmail({}, { message: 'Invalid email address' })
-  email: string;
+  @IsString({ message: 'Username must be a string' })
+  @MinLength(3, { message: 'Username must be at least 3 characters long' })
+  @MaxLength(50, { message: 'Username is too long' })
+  username: string;
 
   @ApiProperty({
     example: 'Password123@',

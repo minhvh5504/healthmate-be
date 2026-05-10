@@ -124,12 +124,17 @@ export class MailService {
    * Send connection invitation email
    */
   async sendConnectionInvitation(data: {
-    toEmail: string;
+    toEmail: string | null;
     inviterName: string;
-    inviterEmail: string;
+    inviterEmail: string | null;
     relationshipId: string;
     token: string;
   }): Promise<void> {
+    if (!data.toEmail) {
+      this.logger.warn('Cannot send connection invitation: toEmail is missing');
+      return;
+    }
+
     if (!this.templates['connection-invitation']) {
       this.logger.error('Connection invitation template not loaded');
       return;
@@ -141,7 +146,7 @@ export class MailService {
 
       const html = this.templates['connection-invitation']({
         inviterName: data.inviterName,
-        inviterEmail: data.inviterEmail,
+        inviterEmail: data.inviterEmail || '',
         acceptUrl,
       });
 

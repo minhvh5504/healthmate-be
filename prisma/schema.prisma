@@ -9,7 +9,8 @@ datasource db {
 
 model User {
   id                  String             @id @default(uuid())
-  email               String             @unique @db.VarChar(255)
+  email               String?            @unique @db.VarChar(255)
+  username            String?            @unique @db.VarChar(255)
   password            String?            @db.VarChar(255)
   role                Role               @default(user)
   emailVerified       Boolean            @default(false) @map("email_verified")
@@ -36,6 +37,7 @@ model User {
   aiMessages         AiMessage[]
 
   @@index([email])
+  @@index([username])
   @@index([googleId])
   @@index([role, isActive])
   @@map("users")
