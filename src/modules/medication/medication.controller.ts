@@ -15,7 +15,7 @@ import {
 import { MedicationService } from './medication.service';
 import { CreateMedicationDto } from './dto/create-medication.dto';
 import { UpdateMedicationDto } from './dto/update-medication.dto';
-import { ApiBearerAuth, ApiOperation, ApiTags, ApiResponse } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
@@ -53,6 +53,9 @@ export class MedicationController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: '[Admin] Get all medications with pagination and search' })
   @ApiResponse({ status: 200, description: 'Medications retrieved successfully' })
+  @ApiQuery({ name: 'page', required: false, type: String })
+  @ApiQuery({ name: 'limit', required: false, type: String })
+  @ApiQuery({ name: 'q', required: false, type: String })
   findAllAdmin(
     @Query('page') page?: string,
     @Query('limit') limit?: string,
