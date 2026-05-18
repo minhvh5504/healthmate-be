@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, IsBoolean, MaxLength, IsUrl } from 'class-validator';
+import { IsString, IsOptional, MaxLength, IsUrl } from 'class-validator';
 
 export class CreateMedicationDto {
   @ApiProperty({ description: 'The name of the medication', maxLength: 255 })
@@ -48,9 +48,4 @@ export class CreateMedicationDto {
   @IsUrl()
   @MaxLength(500)
   imageUrl?: string;
-
-  @ApiPropertyOptional({ description: 'Whether the medication is verified', default: false })
-  @IsOptional()
-  @IsBoolean()
-  isVerified?: boolean;
 }
