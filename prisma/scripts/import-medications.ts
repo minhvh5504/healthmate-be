@@ -55,7 +55,6 @@ async function main() {
             dosage: med.strength,
             manufacturer: med.manufacturer,
             description: med.description,
-            isVerified: med.is_verified || false,
           },
         });
         importedCount++;

@@ -181,24 +181,10 @@ export class UserMedicationService {
       },
     });
 
-    // 3. If matched, also create UserMedication directly
-    if (matchedMedicationId) {
-      await this.prisma.userMedication.create({
-        data: {
-          userId,
-          medicationId: matchedMedicationId,
-          scannedData: scanTask.rawScannedData as Prisma.InputJsonValue,
-          isActive: true,
-        },
-      });
-    }
-
     return ResponseHelper.success(
       scanTask,
       matchedMedicationId ? 'MEDICATION.SCAN.SUCCESS' : 'MEDICATION.SCAN.FAILED',
-      matchedMedicationId
-        ? 'Medication matched and added successfully'
-        : 'No matching medication found',
+      matchedMedicationId ? 'Medication matched successfully' : 'No matching medication found',
     );
   }
   /**

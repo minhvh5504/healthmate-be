@@ -150,7 +150,6 @@ model Medication {
   dosage       String?  @db.VarChar(50)
   manufacturer String?  @db.VarChar(255)
   description  String?  @db.Text
-  isVerified   Boolean  @default(false) @map("is_verified")
   createdBy    String?  @map("created_by")
   createdAt    DateTime @default(now()) @map("created_at")
 
