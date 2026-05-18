@@ -54,7 +54,6 @@ async function main() {
     dosage: item.strength || null,
     manufacturer: item.manufacturer || null,
     description: item.description || null,
-    isVerified: item.is_verified || false,
   }));
 
   if (medicationsDataToInsert.length === 0) {
