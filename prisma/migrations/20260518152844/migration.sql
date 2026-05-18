@@ -6,14 +6,14 @@
 
 */
 -- AlterTable
-ALTER TABLE "medications" DROP COLUMN "is_verified";
+ALTER TABLE "medications" DROP COLUMN IF EXISTS "is_verified";
 
 -- AlterTable
-ALTER TABLE "users" ADD COLUMN     "username" VARCHAR(255),
-ALTER COLUMN "email" DROP NOT NULL;
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "username" VARCHAR(255);
+ALTER TABLE "users" ALTER COLUMN "email" DROP NOT NULL;
 
 -- CreateIndex
-CREATE UNIQUE INDEX "users_username_key" ON "users"("username");
+CREATE UNIQUE INDEX IF NOT EXISTS "users_username_key" ON "users"("username");
 
 -- CreateIndex
-CREATE INDEX "users_username_idx" ON "users"("username");
+CREATE INDEX IF NOT EXISTS "users_username_idx" ON "users"("username");
