@@ -104,9 +104,9 @@ export class UserMedicationService {
    * Scan medication
    */
   async scan(scanDto: ScanMedicationDto, userId: string) {
-    const { scannedText, rawScannedData } = scanDto;
+    const { scannedText, rawScannedData, shape } = scanDto;
 
-    const cleanText = scannedText.trim().replace(/\n/g, ' ');
+    const cleanText = scannedText.trim().replace(/\s+/g, ' ');
 
     // 1. Try to find existing medications
     const keywords = cleanText.split(' ').filter((w) => w.length > 2);
@@ -164,29 +164,62 @@ export class UserMedicationService {
       }
     }
 
-    // 2. Create ScanTask (Always)
-    const scanTask = await this.prisma.medicationScanTask.create({
-      data: {
-        userId,
-        medicationId: matchedMedicationId,
-        status: matchedMedicationId ? 'SUCCESS' : 'FAILED',
-        scannedText: cleanText,
-        rawScannedData: (rawScannedData as Prisma.InputJsonValue) ?? {
-          source: 'OCR',
-          rawText: cleanText,
+    const normalizedRawScannedData = (rawScannedData as Prisma.InputJsonValue) ?? {
+      source: 'OCR',
+      rawText: cleanText,
+      shape,
+    };
+
+    // 2. If there is no catalog match, create a draft medication from OCR text.
+    // This still lets the user add it to their medication list and edit details later.
+    const scanTask = await this.prisma.$transaction(async (tx) => {
+      let medicationId = matchedMedicationId;
+
+      if (!medicationId) {
+        const draftMedication = await tx.medication.create({
+          data: {
+            name: this.buildDraftMedicationName(cleanText),
+            form: shape ? shape.slice(0, 20) : undefined,
+            description: cleanText
+              ? 'Created from unmatched OCR scan: ' + cleanText
+              : 'Created from unmatched OCR scan',
+            createdBy: userId,
+          },
+        });
+
+        medicationId = draftMedication.id;
+      }
+
+      return tx.medicationScanTask.create({
+        data: {
+          userId,
+          medicationId,
+          status: matchedMedicationId ? 'SUCCESS' : 'FAILED',
+          scannedText: cleanText,
+          rawScannedData: normalizedRawScannedData,
         },
-      },
-      include: {
-        medication: true,
-      },
+        include: {
+          medication: true,
+        },
+      });
     });
 
     return ResponseHelper.success(
       scanTask,
       matchedMedicationId ? 'MEDICATION.SCAN.SUCCESS' : 'MEDICATION.SCAN.FAILED',
-      matchedMedicationId ? 'Medication matched successfully' : 'No matching medication found',
+      matchedMedicationId
+        ? 'Medication matched successfully'
+        : 'No matching medication found. Draft medication created from scan text',
     );
   }
+
+  private buildDraftMedicationName(scannedText: string) {
+    const fallbackName = 'Unrecognized medication scan';
+    const name = scannedText || fallbackName;
+
+    return name.slice(0, 255);
+  }
+
   /**
    * Find all scan tasks
    */
