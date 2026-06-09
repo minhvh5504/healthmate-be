@@ -21,6 +21,14 @@ export class AiService {
     });
   }
 
+  async clearHistory(userId: string) {
+    const result = await this.prisma.aiMessage.deleteMany({
+      where: { userId },
+    });
+
+    return { deletedCount: result.count };
+  }
+
   chatStream(
     historyMessages: ChatMessage[],
     userMessage: string,

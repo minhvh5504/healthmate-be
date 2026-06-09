@@ -1,5 +1,5 @@
 import { Roles } from 'src/common/decorators/roles.decorator';
-import { Controller, Post, Body, UseGuards, Res, Get } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Res, Get, Delete, HttpCode, HttpStatus } from '@nestjs/common';
 import { AiService } from './ai.service';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
@@ -24,6 +24,18 @@ export class AiController {
     return {
       success: true,
       data: history,
+    };
+  }
+
+  @Delete('history')
+  @Roles(Role.admin, Role.user)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Clear chat history' })
+  async clearHistory(@CurrentUser('id') userId: string) {
+    const result = await this.aiService.clearHistory(userId);
+    return {
+      success: true,
+      data: result,
     };
   }
 
