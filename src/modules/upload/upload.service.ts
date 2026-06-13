@@ -7,8 +7,9 @@ import { CLOUDINARY } from 'src/common/providers/cloudinary.provider';
 import { ResponseHelper } from '../../common/interfaces/api-response.interface';
 import { MessageCodes } from '../../common/constants/message-codes.const';
 import { ApiException } from '../../common/exceptions/api.exception';
+import { PrismaService } from '../prisma/prisma.service';
 
-type UploadResult = {
+export type UploadResult = {
   url: string; // secure URL of the uploaded image
   publicId: string; // Cloudinary public ID of the uploaded image
 };
@@ -20,7 +21,10 @@ export class UploadService {
   private readonly allowedExtensions = ['.png', '.jpg', '.jpeg', '.svg', '.webp'];
   private readonly maxFileSize = 5 * 1024 * 1024; // 5MB
 
-  constructor(@Inject(CLOUDINARY) private readonly cloudinary: typeof CloudinaryType) {}
+  constructor(
+    @Inject(CLOUDINARY) private readonly cloudinary: typeof CloudinaryType,
+    private readonly prisma: PrismaService,
+  ) {}
 
   async uploadIcon(
     file: Express.Multer.File | undefined,
@@ -65,6 +69,7 @@ export class UploadService {
 
   async uploadAvatar(
     file: Express.Multer.File | undefined,
+    userId?: string,
   ): Promise<ReturnType<typeof ResponseHelper.success<UploadResult>>> {
     // Validate file
     this.validateFile(file);
@@ -81,12 +86,34 @@ export class UploadService {
 
     const result = await this.uploadBufferToCloudinary(file, 'healthmate/avatars');
 
+    if (userId) {
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { avatarUrl: result.url },
+      });
+    }
+
     return ResponseHelper.success(
       result,
       MessageCodes.FILE_UPLOADED,
       'Avatar uploaded successfully',
       201,
     );
+  }
+
+  async uploadMedicationScanImage(file: Express.Multer.File | undefined): Promise<UploadResult> {
+    this.validateFile(file);
+
+    if (!file) {
+      throw new ApiException(
+        MessageCodes.FILE_UPLOAD_FAILED,
+        'No file provided',
+        400,
+        'File upload failed',
+      );
+    }
+
+    return this.uploadBufferToCloudinary(file, 'healthmate/medication-scans');
   }
 
   async deleteAvatar(publicId: string | null | undefined): Promise<void> {
