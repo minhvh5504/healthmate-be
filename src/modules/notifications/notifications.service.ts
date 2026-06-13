@@ -4,10 +4,11 @@ import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { FcmService } from '../firebase/fcm.service';
 import { QueryNotificationDto } from './dto/query-notification.dto';
 import { CreateNotificationDto } from './dto/create-notification.dto';
-import { Prisma } from '@prisma/client';
+import { Notification, Prisma } from '@prisma/client';
 
 export interface CreateNotificationPayload {
   userId: string;
+  reminderScheduleId?: string;
   type: string;
   title: string;
   body: string;
@@ -17,6 +18,20 @@ export interface CreateNotificationPayload {
   /** Extra key-value pairs forwarded to FCM data payload */
   fcmData?: Record<string, string>;
 }
+
+export interface CreateMedicationReminderPayload {
+  ownerUserId: string;
+  userMedicationId: string;
+  reminderScheduleId: string;
+  medicationName: string;
+  dosage?: string | null;
+  scheduledFor: Date;
+}
+
+type MedicationReminderNotificationPayload = CreateNotificationPayload & {
+  reminderScheduleId: string;
+  scheduledFor: Date;
+};
 
 @Injectable()
 export class NotificationsService {
@@ -220,6 +235,7 @@ export class NotificationsService {
     const notification = await this.prisma.notification.create({
       data: {
         userId: payload.userId,
+        reminderScheduleId: payload.reminderScheduleId,
         type: payload.type,
         title: payload.title,
         body: payload.body,
@@ -252,6 +268,54 @@ export class NotificationsService {
     return notification;
   }
 
+  async createMedicationReminderNotifications(payload: CreateMedicationReminderPayload) {
+    const [ownerDisplayName, relatedUserIds] = await Promise.all([
+      this.getUserDisplayName(payload.ownerUserId),
+      this.getAcceptedRelatedUserIds(payload.ownerUserId),
+    ]);
+
+    const medicationDose = this.formatMedicationDose(payload.dosage, payload.medicationName);
+    const baseFcmData = {
+      userMedicationId: payload.userMedicationId,
+      reminderScheduleId: payload.reminderScheduleId,
+    };
+
+    const ownerNotification = await this.createMedicationReminderIfNotExists({
+      userId: payload.ownerUserId,
+      reminderScheduleId: payload.reminderScheduleId,
+      type: 'medication_reminder',
+      title: `Medication Reminder: ${payload.medicationName}`,
+      body: `You have a scheduled dose of ${medicationDose} in 1 hour.`,
+      scheduledFor: payload.scheduledFor,
+      iconType: 'medication',
+      fcmData: {
+        ...baseFcmData,
+        type: 'REMINDER',
+      },
+    });
+
+    const relatedNotifications = await Promise.all(
+      relatedUserIds.map((relatedUserId) =>
+        this.createMedicationReminderIfNotExists({
+          userId: relatedUserId,
+          reminderScheduleId: payload.reminderScheduleId,
+          type: 'medication_reminder',
+          title: `Medication Reminder for ${ownerDisplayName}`,
+          body: `Please remind ${ownerDisplayName} to take ${medicationDose} in 1 hour.`,
+          scheduledFor: payload.scheduledFor,
+          iconType: 'medication',
+          fcmData: {
+            ...baseFcmData,
+            ownerUserId: payload.ownerUserId,
+            type: 'FAMILY_REMINDER',
+          },
+        }),
+      ),
+    );
+
+    return [ownerNotification, ...relatedNotifications];
+  }
+
   async registerDeviceToken(userId: string, dto: { token: string; platform: string }) {
     return await this.prisma.deviceToken.upsert({
       where: { token: dto.token },
@@ -273,6 +337,69 @@ export class NotificationsService {
   // ============================================
   // PRIVATE HELPERS
   // ============================================
+
+  private async createMedicationReminderIfNotExists(
+    payload: MedicationReminderNotificationPayload,
+  ): Promise<Notification> {
+    const exists = await this.prisma.notification.findFirst({
+      where: {
+        userId: payload.userId,
+        reminderScheduleId: payload.reminderScheduleId,
+        type: payload.type,
+        scheduledFor: payload.scheduledFor,
+      },
+    });
+
+    if (exists) {
+      return exists;
+    }
+
+    return this.createNotification(payload);
+  }
+
+  private async getAcceptedRelatedUserIds(userId: string) {
+    const relationships = await this.prisma.userRelationship.findMany({
+      where: {
+        status: 'accepted',
+        OR: [{ userId }, { relatedUserId: userId }],
+      },
+      select: {
+        userId: true,
+        relatedUserId: true,
+      },
+    });
+
+    return [
+      ...new Set(
+        relationships
+          .map((relationship) =>
+            relationship.userId === userId ? relationship.relatedUserId : relationship.userId,
+          )
+          .filter((relatedUserId) => relatedUserId !== userId),
+      ),
+    ];
+  }
+
+  private async getUserDisplayName(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        email: true,
+        username: true,
+        profile: {
+          select: {
+            fullName: true,
+          },
+        },
+      },
+    });
+
+    return user?.profile?.fullName || user?.username || user?.email || 'your family member';
+  }
+
+  private formatMedicationDose(dosage: string | null | undefined, medicationName: string) {
+    return [dosage?.trim(), medicationName.trim()].filter(Boolean).join(' ');
+  }
 
   /**
    * Send FCM push to all registered devices of a user

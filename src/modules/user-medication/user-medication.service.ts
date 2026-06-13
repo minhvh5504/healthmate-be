@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { UploadService } from '../upload/upload.service';
 import { CreateUserMedicationDto } from './dto/create-user-medication.dto';
 import { UpdateUserMedicationDto } from './dto/update-user-medication.dto';
 import { ScanMedicationDto } from './dto/scan-medication.dto';
@@ -15,6 +16,7 @@ export class UserMedicationService {
   constructor(
     private prisma: PrismaService,
     private notificationsService: NotificationsService,
+    private uploadService: UploadService,
   ) {}
   /**
    * Create user medication
@@ -71,23 +73,17 @@ export class UserMedicationService {
     if (userMedication.reminderSchedules?.length) {
       await Promise.all(
         userMedication.reminderSchedules.map((schedule) => {
-          // Tính thời gian uống thuốc
           const medicationTime = this.getNextScheduledTime(schedule.remindTime);
-          // Nhắc trước 1 giờ
+
           const scheduledFor = new Date(medicationTime.getTime() - 60 * 60 * 1000);
 
-          return this.notificationsService.createNotification({
-            userId,
-            type: 'medication_reminder',
-            title: `Medication Reminder: ${medication.name}`,
-            body: `You have a scheduled dose of ${schedule.dosage || ''} ${medication.name} in 1 hour.`,
+          return this.notificationsService.createMedicationReminderNotifications({
+            ownerUserId: userId,
+            userMedicationId: userMedication.id,
+            reminderScheduleId: schedule.id,
+            medicationName: medication.name,
+            dosage: schedule.dosage,
             scheduledFor,
-            iconType: 'medication',
-            fcmData: {
-              userMedicationId: userMedication.id,
-              reminderScheduleId: schedule.id,
-              type: 'REMINDER',
-            },
           });
         }),
       );
@@ -103,7 +99,7 @@ export class UserMedicationService {
   /**
    * Scan medication
    */
-  async scan(scanDto: ScanMedicationDto, userId: string) {
+  async scan(scanDto: ScanMedicationDto, userId: string, imageFile?: Express.Multer.File) {
     const { scannedText, rawScannedData, shape } = scanDto;
 
     const cleanText = scannedText.trim().replace(/\s+/g, ' ');
@@ -164,11 +160,36 @@ export class UserMedicationService {
       }
     }
 
-    const normalizedRawScannedData = (rawScannedData as Prisma.InputJsonValue) ?? {
-      source: 'OCR',
-      rawText: cleanText,
-      shape,
-    };
+    let parsedRawScannedData: unknown = rawScannedData;
+    if (typeof rawScannedData === 'string' && rawScannedData.trim()) {
+      try {
+        parsedRawScannedData = JSON.parse(rawScannedData);
+      } catch {
+        parsedRawScannedData = { raw: rawScannedData };
+      }
+    }
+
+    const uploadedImage = imageFile
+      ? await this.uploadService.uploadMedicationScanImage(imageFile)
+      : null;
+
+    const rawScannedDataObject =
+      parsedRawScannedData &&
+      typeof parsedRawScannedData === 'object' &&
+      !Array.isArray(parsedRawScannedData)
+        ? (parsedRawScannedData as Record<string, unknown>)
+        : {
+            source: 'OCR',
+            rawText: cleanText,
+            shape,
+          };
+
+    const normalizedRawScannedData = {
+      ...rawScannedDataObject,
+      ...(uploadedImage
+        ? { imageUrl: uploadedImage.url, imagePublicId: uploadedImage.publicId }
+        : {}),
+    } as Prisma.InputJsonValue;
 
     // 2. If there is no catalog match, create a draft medication from OCR text.
     // This still lets the user add it to their medication list and edit details later.
@@ -197,6 +218,8 @@ export class UserMedicationService {
           status: matchedMedicationId ? 'SUCCESS' : 'FAILED',
           scannedText: cleanText,
           rawScannedData: normalizedRawScannedData,
+          imageUrl: uploadedImage?.url,
+          imagePublicId: uploadedImage?.publicId,
         },
         include: {
           medication: true,
@@ -315,7 +338,7 @@ export class UserMedicationService {
     const dailyLogs = await this.prisma.medicationLog.findMany({
       where: {
         userMedication: { userId },
-        createdAt: {
+        actualAt: {
           gte: startOfDay,
           lte: endOfDay,
         },

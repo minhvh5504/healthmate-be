@@ -42,11 +42,33 @@ export class MedicationLogsService {
         getMealInstructionFromTime(timeToCompare.getHours(), timeToCompare.getMinutes());
     }
 
-    // 4. Create log
-    const log = await this.prisma.medicationLog.create({
-      data: {
-        ...logData,
-      },
+    const takenQuantity =
+      logData.status === MedicationLogStatus.TAKEN
+        ? await this.getTakenQuantity(logData, userMedication.quantity)
+        : 0;
+
+    // 4. Create log and reduce stock when the medication was taken
+    const log = await this.prisma.$transaction(async (tx) => {
+      const createdLog = await tx.medicationLog.create({
+        data: {
+          ...logData,
+        },
+      });
+
+      if (
+        logData.status === MedicationLogStatus.TAKEN &&
+        userMedication.stockCount !== null &&
+        takenQuantity > 0
+      ) {
+        await tx.userMedication.update({
+          where: { id: userMedication.id },
+          data: {
+            stockCount: Math.max(userMedication.stockCount - takenQuantity, 0),
+          },
+        });
+      }
+
+      return createdLog;
     });
 
     return ResponseHelper.success(
@@ -54,6 +76,28 @@ export class MedicationLogsService {
       MessageCodes.MEDICATION_LOG_CREATED,
       'Medication log recorded successfully',
     );
+  }
+
+  private async getTakenQuantity(
+    logData: CreateMedicationLogDto,
+    userMedicationQuantity: number | null,
+  ) {
+    if (logData.actualQuantity !== undefined) {
+      return logData.actualQuantity;
+    }
+
+    if (logData.reminderScheduleId) {
+      const reminderSchedule = await this.prisma.reminderSchedule.findFirst({
+        where: { id: logData.reminderScheduleId, userMedicationId: logData.userMedicationId },
+        select: { quantity: true },
+      });
+
+      if (reminderSchedule?.quantity !== null && reminderSchedule?.quantity !== undefined) {
+        return reminderSchedule.quantity;
+      }
+    }
+
+    return userMedicationQuantity ?? 1;
   }
 
   async findHistory(userId: string, userMedicationId?: string, range?: string, date?: string) {

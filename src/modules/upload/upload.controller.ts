@@ -11,6 +11,7 @@ import {
 import { UploadService } from './upload.service';
 import { Role } from '@prisma/client';
 import { MessageCodes } from 'src/common/constants/message-codes.const';
+import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
@@ -76,6 +77,7 @@ export class UploadController {
   }
 
   @Post('avatar')
+  @Roles(Role.admin, Role.user)
   @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({
     summary: 'Upload user avatar',
@@ -119,8 +121,11 @@ export class UploadController {
     status: 401,
     description: 'Unauthorized',
   })
-  async uploadAvatar(@UploadedFile() file: Express.Multer.File) {
-    const response = await this.uploadService.uploadAvatar(file);
+  async uploadAvatar(
+    @CurrentUser('id') userId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    const response = await this.uploadService.uploadAvatar(file, userId);
     const { url, publicId } = response.data!;
 
     return ResponseHelper.success(
