@@ -11,12 +11,22 @@ import {
   HttpCode,
   HttpStatus,
   Query,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { UserMedicationService } from './user-medication.service';
 import { CreateUserMedicationDto } from './dto/create-user-medication.dto';
 import { UpdateUserMedicationDto } from './dto/update-user-medication.dto';
 import { ScanMedicationDto } from './dto/scan-medication.dto';
-import { ApiBearerAuth, ApiOperation, ApiTags, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiTags,
+  ApiResponse,
+  ApiConsumes,
+  ApiBody,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
@@ -41,10 +51,31 @@ export class UserMedicationController {
   @Post('scan')
   @Roles(Role.user, Role.admin)
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Process OCR text from MLKit to find medications' })
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiConsumes('multipart/form-data', 'application/json')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['scannedText'],
+      properties: {
+        scannedText: { type: 'string' },
+        shape: { type: 'string' },
+        rawScannedData: {
+          oneOf: [{ type: 'object' }, { type: 'string' }],
+          description: 'Raw OCR data as JSON object or JSON string when using multipart/form-data',
+        },
+        file: { type: 'string', format: 'binary', description: 'Original color scan image' },
+      },
+    },
+  })
+  @ApiOperation({ summary: 'Process OCR text from MLKit and save the original scan image' })
   @ApiResponse({ status: 201, description: 'Generated medication list successfully' })
-  scan(@Body() dto: ScanMedicationDto, @Request() req) {
-    return this.userMedicationService.scan(dto, req.user.id);
+  scan(
+    @Body() dto: ScanMedicationDto,
+    @Request() req,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    return this.userMedicationService.scan(dto, req.user.id, file);
   }
 
   @Get('scan-tasks')

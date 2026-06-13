@@ -42,12 +42,16 @@ export class AiService {
         })
         .catch((err) => this.logger.error('Failed to save user message:', err));
 
-      const tools: AiTool[] = [this.medicationTool.getToolDefinition() as AiTool];
+      const tools: AiTool[] = this.medicationTool.getToolDefinitions() as AiTool[];
 
-      const executeTool = async (name: string) => {
+      const executeTool = async (name: string, args: Record<string, unknown>) => {
         this.logger.log(`Executing tool: ${name}`);
-        if (name === 'get_user_medications') {
-          return this.medicationTool.execute(userId);
+        if (
+          name === 'get_user_medications' ||
+          name === 'get_today_medication_schedule' ||
+          name === 'get_user_bmi_analysis'
+        ) {
+          return this.medicationTool.execute(userId, name, args);
         }
         return { error: `Tool ${name} not found` };
       };
