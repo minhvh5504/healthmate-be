@@ -70,7 +70,7 @@ export class UserMedicationService {
       });
     });
 
-    if (userMedication.reminderSchedules?.length) {
+    if (medicationData.reminderEnabled !== false && userMedication.reminderSchedules?.length) {
       await Promise.all(
         userMedication.reminderSchedules.map((schedule) => {
           const medicationTime = this.getNextScheduledTime(schedule.remindTime);
@@ -89,6 +89,8 @@ export class UserMedicationService {
       );
     }
 
+    await this.maybeCreateLowStockReminder(userMedication, userId);
+
     return ResponseHelper.success(
       userMedication,
       MessageCodes.MEDICATION_CREATED,
@@ -104,41 +106,40 @@ export class UserMedicationService {
 
     const cleanText = scannedText.trim().replace(/\s+/g, ' ');
 
-    // 1. Try to find existing medications
-    const keywords = cleanText.split(' ').filter((w) => w.length > 2);
+    // 1. Try to find existing medications. OCR text from mobile is usually
+    // accent-free, while medication names in DB are Vietnamese with accents.
+    const normalizedScanText = this.normalizeSearchText(cleanText);
+    const keywords = normalizedScanText.split(' ').filter((w) => w.length > 2);
 
     let matchedMedicationId: string | null = null;
 
     if (keywords.length > 0) {
       const candidates = await this.prisma.medication.findMany({
         where: {
-          OR: [
-            ...keywords.map((kw) => ({
-              name: { contains: kw, mode: 'insensitive' as Prisma.QueryMode },
-            })),
-            ...keywords.map((kw) => ({
-              genericName: { contains: kw, mode: 'insensitive' as Prisma.QueryMode },
-            })),
-          ],
+          createdBy: null,
         },
-        take: 20,
+        select: {
+          id: true,
+          name: true,
+          genericName: true,
+          manufacturer: true,
+        },
       });
 
       if (candidates.length > 0) {
-        // Evaluate candidates to prevent false positives
+        // Evaluate candidates to prevent false positives.
         const scoredCandidates = candidates.map((candidate) => {
-          const nameLower = candidate.name.toLowerCase();
-          const genericLower = (candidate.genericName || '').toLowerCase();
+          const searchableText = this.normalizeSearchText(
+            [candidate.name, candidate.genericName, candidate.manufacturer]
+              .filter(Boolean)
+              .join(' '),
+          );
 
           let score = 0;
           let matchedKeywordsCount = 0;
 
           for (const kw of keywords) {
-            const kwLower = kw.toLowerCase();
-            const matchesName = nameLower.includes(kwLower);
-            const matchesGeneric = genericLower.includes(kwLower);
-
-            if (matchesName || matchesGeneric) {
+            if (searchableText.includes(kw)) {
               score += kw.length;
               matchedKeywordsCount++;
             }
@@ -191,40 +192,21 @@ export class UserMedicationService {
         : {}),
     } as Prisma.InputJsonValue;
 
-    // 2. If there is no catalog match, create a draft medication from OCR text.
-    // This still lets the user add it to their medication list and edit details later.
-    const scanTask = await this.prisma.$transaction(async (tx) => {
-      let medicationId = matchedMedicationId;
-
-      if (!medicationId) {
-        const draftMedication = await tx.medication.create({
-          data: {
-            name: this.buildDraftMedicationName(cleanText),
-            form: shape ? shape.slice(0, 20) : undefined,
-            description: cleanText
-              ? 'Created from unmatched OCR scan: ' + cleanText
-              : 'Created from unmatched OCR scan',
-            createdBy: userId,
-          },
-        });
-
-        medicationId = draftMedication.id;
-      }
-
-      return tx.medicationScanTask.create({
-        data: {
-          userId,
-          medicationId,
-          status: matchedMedicationId ? 'SUCCESS' : 'FAILED',
-          scannedText: cleanText,
-          rawScannedData: normalizedRawScannedData,
-          imageUrl: uploadedImage?.url,
-          imagePublicId: uploadedImage?.publicId,
-        },
-        include: {
-          medication: true,
-        },
-      });
+    // 2. Save the scan result. Failed scans keep OCR text/image only so the
+    // client can let users add the medication manually.
+    const scanTask = await this.prisma.medicationScanTask.create({
+      data: {
+        userId,
+        medicationId: matchedMedicationId,
+        status: matchedMedicationId ? 'SUCCESS' : 'FAILED',
+        scannedText: cleanText,
+        rawScannedData: normalizedRawScannedData,
+        imageUrl: uploadedImage?.url,
+        imagePublicId: uploadedImage?.publicId,
+      },
+      include: {
+        medication: true,
+      },
     });
 
     return ResponseHelper.success(
@@ -232,7 +214,7 @@ export class UserMedicationService {
       matchedMedicationId ? 'MEDICATION.SCAN.SUCCESS' : 'MEDICATION.SCAN.FAILED',
       matchedMedicationId
         ? 'Medication matched successfully'
-        : 'No matching medication found. Draft medication created from scan text',
+        : 'No matching medication found. OCR scan saved for manual review',
     );
   }
 
@@ -241,6 +223,18 @@ export class UserMedicationService {
     const name = scannedText || fallbackName;
 
     return name.slice(0, 255);
+  }
+
+  private normalizeSearchText(value: string) {
+    return value
+      .toLowerCase()
+      .replace(/đ/g, 'd')
+      .replace(/Đ/g, 'd')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   /**
@@ -540,6 +534,12 @@ export class UserMedicationService {
       });
     });
 
+    if (updateDto.reminderEnabled === false) {
+      await this.notificationsService.cancelPendingMedicationRemindersForUserMedication(id);
+    }
+
+    await this.maybeCreateLowStockReminder(updated, userId);
+
     return ResponseHelper.success(
       updated,
       MessageCodes.MEDICATION_UPDATED,
@@ -549,6 +549,36 @@ export class UserMedicationService {
   /**
    * Remove user medication
    */
+
+  private async maybeCreateLowStockReminder(
+    userMedication: {
+      id: string;
+      userId: string;
+      stockCount: number | null;
+      lowStockThreshold: number;
+      lowStockReminderEnabled: boolean;
+      medication?: { name: string } | null;
+    } | null,
+    fallbackUserId: string,
+  ) {
+    if (
+      !userMedication?.lowStockReminderEnabled ||
+      userMedication.stockCount === null ||
+      userMedication.stockCount > userMedication.lowStockThreshold ||
+      !userMedication.medication
+    ) {
+      return;
+    }
+
+    await this.notificationsService.createMedicationStockReminderNotifications({
+      ownerUserId: userMedication.userId || fallbackUserId,
+      userMedicationId: userMedication.id,
+      medicationName: userMedication.medication.name,
+      stockCount: userMedication.stockCount,
+      lowStockThreshold: userMedication.lowStockThreshold,
+    });
+  }
+
   async remove(id: string, userId: string) {
     const existing = await this.prisma.userMedication.findFirst({
       where: { id, userId },

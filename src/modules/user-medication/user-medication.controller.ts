@@ -70,11 +70,7 @@ export class UserMedicationController {
   })
   @ApiOperation({ summary: 'Process OCR text from MLKit and save the original scan image' })
   @ApiResponse({ status: 201, description: 'Generated medication list successfully' })
-  scan(
-    @Body() dto: ScanMedicationDto,
-    @Request() req,
-    @UploadedFile() file?: Express.Multer.File,
-  ) {
+  scan(@Body() dto: ScanMedicationDto, @Request() req, @UploadedFile() file?: Express.Multer.File) {
     return this.userMedicationService.scan(dto, req.user.id, file);
   }
 

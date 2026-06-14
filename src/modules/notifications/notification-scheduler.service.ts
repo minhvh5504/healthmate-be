@@ -18,6 +18,7 @@ export class NotificationSchedulerService {
   @Cron(CronExpression.EVERY_MINUTE)
   async handleScheduledNotifications() {
     await this.ensureUpcomingMedicationReminders();
+    await this.ensureLowStockReminders();
 
     const now = new Date();
 
@@ -99,6 +100,34 @@ export class NotificationSchedulerService {
           scheduledFor,
         });
       }
+    }
+  }
+
+  private async ensureLowStockReminders() {
+    const userMedications = await this.prisma.userMedication.findMany({
+      where: {
+        isActive: true,
+        lowStockReminderEnabled: true,
+        stockCount: { not: null },
+      },
+      include: { medication: true },
+    });
+
+    for (const userMedication of userMedications) {
+      if (
+        userMedication.stockCount === null ||
+        userMedication.stockCount > userMedication.lowStockThreshold
+      ) {
+        continue;
+      }
+
+      await this.notificationsService.createMedicationStockReminderNotifications({
+        ownerUserId: userMedication.userId,
+        userMedicationId: userMedication.id,
+        medicationName: userMedication.medication.name,
+        stockCount: userMedication.stockCount,
+        lowStockThreshold: userMedication.lowStockThreshold,
+      });
     }
   }
 

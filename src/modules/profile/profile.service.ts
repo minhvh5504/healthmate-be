@@ -55,30 +55,57 @@ export class ProfileService {
       profile.bmiStatus = bmiStatus;
     }
 
-    // Fetch logs for health delta
-    const logs = await this.prisma.userHealthLog.findMany({
-      where: { userId },
-      orderBy: { recordedAt: 'desc' },
-      take: 2,
-    });
-
     let healthDelta: {
       weightKg: number;
       heightCm: number;
       daysSinceLastUpdate: number;
     } | null = null;
-    if (logs.length === 2) {
-      const current = logs[0];
-      const previous = logs[1];
 
-      const diffTime = Math.abs(current.recordedAt.getTime() - previous.recordedAt.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    if (profile) {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-      healthDelta = {
-        weightKg: Number(current.weightKg) - Number(previous.weightKg),
-        heightCm: Number(current.heightCm) - Number(previous.heightCm),
-        daysSinceLastUpdate: diffDays,
-      };
+      const healthAverages = await this.prisma.userHealthLog.aggregate({
+        where: {
+          userId,
+          recordedAt: { gte: thirtyDaysAgo },
+        },
+        _avg: {
+          weightKg: true,
+          heightCm: true,
+        },
+      });
+
+      const currentWeightKg =
+        profile.weightKg !== null && profile.weightKg !== undefined
+          ? Number(profile.weightKg)
+          : null;
+      const currentHeightCm =
+        profile.heightCm !== null && profile.heightCm !== undefined
+          ? Number(profile.heightCm)
+          : null;
+      const averageWeightKg =
+        healthAverages._avg.weightKg !== null && healthAverages._avg.weightKg !== undefined
+          ? Number(healthAverages._avg.weightKg)
+          : null;
+      const averageHeightCm =
+        healthAverages._avg.heightCm !== null && healthAverages._avg.heightCm !== undefined
+          ? Number(healthAverages._avg.heightCm)
+          : null;
+
+      if (averageWeightKg !== null || averageHeightCm !== null) {
+        healthDelta = {
+          weightKg:
+            currentWeightKg !== null && averageWeightKg !== null
+              ? currentWeightKg - averageWeightKg
+              : 0,
+          heightCm:
+            currentHeightCm !== null && averageHeightCm !== null
+              ? currentHeightCm - averageHeightCm
+              : 0,
+          daysSinceLastUpdate: 30,
+        };
+      }
     }
 
     const result = {
@@ -169,13 +196,16 @@ export class ProfileService {
         } as any,
       });
 
-      // Insert into UserHealthLog if height or weight is provided
-      if (updateProfileDto.heightCm !== undefined || updateProfileDto.weightKg !== undefined) {
+      // Log only the metric fields that were explicitly updated.
+      const shouldLogHeight = updateProfileDto.heightCm !== undefined;
+      const shouldLogWeight = updateProfileDto.weightKg !== undefined;
+
+      if (shouldLogHeight || shouldLogWeight) {
         await tx.userHealthLog.create({
           data: {
             userId,
-            heightCm: heightCm !== null ? heightCm : undefined,
-            weightKg: weightKg !== null ? weightKg : undefined,
+            heightCm: shouldLogHeight && heightCm !== null ? heightCm : undefined,
+            weightKg: shouldLogWeight && weightKg !== null ? weightKg : undefined,
             bmi,
             bmiStatus,
           },

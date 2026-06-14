@@ -7,10 +7,14 @@ import { MessageCodes } from '../../common/constants/message-codes.const';
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 import { getMealInstructionFromTime } from '../../common/utils/medication-helper';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class MedicationLogsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificationsService: NotificationsService,
+  ) {}
 
   async create(dto: CreateMedicationLogDto, userId: string) {
     // 1. Ownership check
@@ -28,9 +32,9 @@ export class MedicationLogsService {
       );
     }
 
-    // 2. Set default actualAt if status is taken and not provided
+    // 2. Set default actualAt if the client did not provide the intended log date
     const logData = { ...dto };
-    if (logData.status === MedicationLogStatus.TAKEN && !logData.actualAt) {
+    if (!logData.actualAt) {
       logData.actualAt = new Date();
     }
 
@@ -48,6 +52,8 @@ export class MedicationLogsService {
         : 0;
 
     // 4. Create log and reduce stock when the medication was taken
+    let updatedStockCount: number | null = userMedication.stockCount;
+
     const log = await this.prisma.$transaction(async (tx) => {
       const createdLog = await tx.medicationLog.create({
         data: {
@@ -60,16 +66,39 @@ export class MedicationLogsService {
         userMedication.stockCount !== null &&
         takenQuantity > 0
       ) {
+        updatedStockCount = Math.max(userMedication.stockCount - takenQuantity, 0);
         await tx.userMedication.update({
           where: { id: userMedication.id },
           data: {
-            stockCount: Math.max(userMedication.stockCount - takenQuantity, 0),
+            stockCount: updatedStockCount,
           },
         });
       }
 
       return createdLog;
     });
+
+    if (
+      logData.status === MedicationLogStatus.TAKEN &&
+      userMedication.lowStockReminderEnabled &&
+      updatedStockCount !== null &&
+      updatedStockCount <= userMedication.lowStockThreshold
+    ) {
+      const medication = await this.prisma.medication.findUnique({
+        where: { id: userMedication.medicationId },
+        select: { name: true },
+      });
+
+      if (medication) {
+        await this.notificationsService.createMedicationStockReminderNotifications({
+          ownerUserId: userMedication.userId,
+          userMedicationId: userMedication.id,
+          medicationName: medication.name,
+          stockCount: updatedStockCount,
+          lowStockThreshold: userMedication.lowStockThreshold,
+        });
+      }
+    }
 
     return ResponseHelper.success(
       log,
@@ -132,7 +161,7 @@ export class MedicationLogsService {
           start = startOfDay(referenceDate);
           end = endOfDay(referenceDate);
       }
-      whereClause.createdAt = {
+      whereClause.actualAt = {
         gte: start,
         lte: end,
       };
@@ -148,7 +177,7 @@ export class MedicationLogsService {
         },
         reminderSchedule: true,
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ actualAt: 'desc' }, { createdAt: 'desc' }],
     });
 
     const logsWithNumericQuantity = logs.map((log) => ({

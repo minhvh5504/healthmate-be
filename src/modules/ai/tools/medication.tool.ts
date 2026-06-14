@@ -161,7 +161,7 @@ export class MedicationTool {
     const dailyLogs = await this.prisma.medicationLog.findMany({
       where: {
         userMedication: { userId },
-        createdAt: {
+        actualAt: {
           gte: startOfDay,
           lte: endOfDay,
         },
