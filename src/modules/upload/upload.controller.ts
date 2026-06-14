@@ -121,10 +121,7 @@ export class UploadController {
     status: 401,
     description: 'Unauthorized',
   })
-  async uploadAvatar(
-    @CurrentUser('id') userId: string,
-    @UploadedFile() file: Express.Multer.File,
-  ) {
+  async uploadAvatar(@CurrentUser('id') userId: string, @UploadedFile() file: Express.Multer.File) {
     const response = await this.uploadService.uploadAvatar(file, userId);
     const { url, publicId } = response.data!;
 

@@ -1,5 +1,15 @@
 import { Roles } from 'src/common/decorators/roles.decorator';
-import { Controller, Post, Body, UseGuards, Res, Get, Delete, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  UseGuards,
+  Res,
+  Get,
+  Delete,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
 import { AiService } from './ai.service';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
