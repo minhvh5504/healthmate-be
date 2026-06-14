@@ -486,25 +486,46 @@ export class UserMedicationService {
         data: cleanMedicationData,
       });
 
-      // 2. If schedules provided, replace them entirely
+      // 2. If schedules provided, update existing rows in place so medication logs
+      // keep matching by reminderScheduleId after a time or quantity edit.
       if (schedules) {
-        await tx.reminderSchedule.deleteMany({
-          where: { userMedicationId: id },
+        const existingScheduleIds = new Set(existing.reminderSchedules.map((s) => s.id));
+        const incomingExistingIds = schedules
+          .map((s) => s.id)
+          .filter((scheduleId): scheduleId is string => Boolean(scheduleId));
+        const firstExistingSchedule = existing.reminderSchedules[0];
+
+        await tx.reminderSchedule.updateMany({
+          where: {
+            userMedicationId: id,
+            id: { notIn: incomingExistingIds },
+          },
+          data: { isActive: false },
         });
 
-        // Create new ones
-        if (schedules.length > 0) {
-          await tx.reminderSchedule.createMany({
-            data: schedules.map((s) => ({
-              userMedicationId: id,
-              remindTime: s.time,
-              quantity: s.quantity,
-              dosage: updateDto.dosage || existing.dosage,
-              repeatType: frequency || existing.reminderSchedules[0]?.repeatType || 'daily',
-              repeatDays: selectedDays || existing.reminderSchedules[0]?.repeatDays || [],
-              isActive: updateDto.reminderEnabled ?? existing.reminderEnabled ?? true,
-            })),
-          });
+        for (const schedule of schedules) {
+          const scheduleData = {
+            remindTime: schedule.time,
+            quantity: schedule.quantity,
+            dosage: updateDto.dosage || existing.dosage,
+            repeatType: frequency || firstExistingSchedule?.repeatType || 'daily',
+            repeatDays: selectedDays || firstExistingSchedule?.repeatDays || [],
+            isActive: updateDto.reminderEnabled ?? existing.reminderEnabled ?? true,
+          };
+
+          if (schedule.id && existingScheduleIds.has(schedule.id)) {
+            await tx.reminderSchedule.update({
+              where: { id: schedule.id },
+              data: scheduleData,
+            });
+          } else {
+            await tx.reminderSchedule.create({
+              data: {
+                userMedicationId: id,
+                ...scheduleData,
+              },
+            });
+          }
         }
       } else {
         // Build partial update for existing schedules

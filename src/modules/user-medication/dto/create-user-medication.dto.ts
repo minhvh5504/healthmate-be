@@ -12,6 +12,11 @@ import {
 import { Type } from 'class-transformer';
 
 export class ScheduleItemDto {
+  @ApiPropertyOptional({ description: 'Existing reminder schedule ID when updating' })
+  @IsString()
+  @IsOptional()
+  id?: string;
+
   @ApiProperty({ description: 'Time string HH:mm' })
   @IsString()
   time: string;
