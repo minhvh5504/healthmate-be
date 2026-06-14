@@ -28,6 +28,14 @@ export interface CreateMedicationReminderPayload {
   scheduledFor: Date;
 }
 
+export interface CreateMedicationStockReminderPayload {
+  ownerUserId: string;
+  userMedicationId: string;
+  medicationName: string;
+  stockCount: number;
+  lowStockThreshold: number;
+}
+
 type MedicationReminderNotificationPayload = CreateNotificationPayload & {
   reminderScheduleId: string;
   scheduledFor: Date;
@@ -170,9 +178,30 @@ export class NotificationsService {
   async sendExistingNotification(id: string) {
     const notification = await this.prisma.notification.findUnique({
       where: { id },
+      include: {
+        reminderSchedule: {
+          include: { userMedication: true },
+        },
+      },
     });
 
     if (!notification || notification.deliveryStatus !== 'pending') {
+      return;
+    }
+
+    if (
+      notification.type === 'medication_reminder' &&
+      (!notification.reminderSchedule?.isActive ||
+        !notification.reminderSchedule.userMedication.isActive ||
+        !notification.reminderSchedule.userMedication.reminderEnabled)
+    ) {
+      await this.prisma.notification.update({
+        where: { id },
+        data: {
+          deliveryStatus: 'cancelled',
+          failureReason: 'Medication reminder is disabled',
+        },
+      });
       return;
     }
 
@@ -269,6 +298,15 @@ export class NotificationsService {
   }
 
   async createMedicationReminderNotifications(payload: CreateMedicationReminderPayload) {
+    const userMedication = await this.prisma.userMedication.findUnique({
+      where: { id: payload.userMedicationId },
+      select: { isActive: true, reminderEnabled: true },
+    });
+
+    if (!userMedication?.isActive || !userMedication.reminderEnabled) {
+      return [];
+    }
+
     const [ownerDisplayName, relatedUserIds] = await Promise.all([
       this.getUserDisplayName(payload.ownerUserId),
       this.getAcceptedRelatedUserIds(payload.ownerUserId),
@@ -284,7 +322,7 @@ export class NotificationsService {
       userId: payload.ownerUserId,
       reminderScheduleId: payload.reminderScheduleId,
       type: 'medication_reminder',
-      title: `Medication Reminder: ${payload.medicationName}`,
+      title: 'Medication Reminder',
       body: `You have a scheduled dose of ${medicationDose} in 1 hour.`,
       scheduledFor: payload.scheduledFor,
       iconType: 'medication',
@@ -300,7 +338,7 @@ export class NotificationsService {
           userId: relatedUserId,
           reminderScheduleId: payload.reminderScheduleId,
           type: 'medication_reminder',
-          title: `Medication Reminder for ${ownerDisplayName}`,
+          title: 'Medication Reminder',
           body: `Please remind ${ownerDisplayName} to take ${medicationDose} in 1 hour.`,
           scheduledFor: payload.scheduledFor,
           iconType: 'medication',
@@ -314,6 +352,82 @@ export class NotificationsService {
     );
 
     return [ownerNotification, ...relatedNotifications];
+  }
+
+  async createMedicationStockReminderNotifications(payload: CreateMedicationStockReminderPayload) {
+    if (payload.stockCount > payload.lowStockThreshold) {
+      return [];
+    }
+
+    const [ownerDisplayName, relatedUserIds] = await Promise.all([
+      this.getUserDisplayName(payload.ownerUserId),
+      this.getAcceptedRelatedUserIds(payload.ownerUserId),
+    ]);
+
+    const actionUrl = `/medicine/${payload.userMedicationId}/stock`;
+    const baseFcmData = {
+      userMedicationId: payload.userMedicationId,
+      stockCount: payload.stockCount.toString(),
+      lowStockThreshold: payload.lowStockThreshold.toString(),
+    };
+
+    const ownerNotification = await this.createMedicationStockReminderIfNotExists({
+      userId: payload.ownerUserId,
+      type: 'low_stock_reminder',
+      title: 'Medication Stock Reminder',
+      body: `${payload.medicationName} is running low (${payload.stockCount} left).`,
+      scheduledFor: new Date(),
+      iconType: 'medication',
+      actionUrl,
+      fcmData: {
+        ...baseFcmData,
+        type: 'LOW_STOCK',
+      },
+    });
+
+    const relatedNotifications = await Promise.all(
+      relatedUserIds.map((relatedUserId) =>
+        this.createMedicationStockReminderIfNotExists({
+          userId: relatedUserId,
+          type: 'low_stock_reminder',
+          title: 'Medication Stock Reminder',
+          body: `${ownerDisplayName} is running low on ${payload.medicationName} (${payload.stockCount} left).`,
+          scheduledFor: new Date(),
+          iconType: 'medication',
+          actionUrl,
+          fcmData: {
+            ...baseFcmData,
+            ownerUserId: payload.ownerUserId,
+            type: 'FAMILY_LOW_STOCK',
+          },
+        }),
+      ),
+    );
+
+    return [ownerNotification, ...relatedNotifications];
+  }
+
+  async cancelPendingMedicationRemindersForUserMedication(userMedicationId: string) {
+    const schedules = await this.prisma.reminderSchedule.findMany({
+      where: { userMedicationId },
+      select: { id: true },
+    });
+
+    if (schedules.length === 0) {
+      return { count: 0 };
+    }
+
+    return this.prisma.notification.updateMany({
+      where: {
+        reminderScheduleId: { in: schedules.map((schedule) => schedule.id) },
+        type: 'medication_reminder',
+        deliveryStatus: 'pending',
+      },
+      data: {
+        deliveryStatus: 'cancelled',
+        failureReason: 'Medication reminder is disabled',
+      },
+    });
   }
 
   async registerDeviceToken(userId: string, dto: { token: string; platform: string }) {
@@ -347,6 +461,27 @@ export class NotificationsService {
         reminderScheduleId: payload.reminderScheduleId,
         type: payload.type,
         scheduledFor: payload.scheduledFor,
+      },
+    });
+
+    if (exists) {
+      return exists;
+    }
+
+    return this.createNotification(payload);
+  }
+
+  private async createMedicationStockReminderIfNotExists(
+    payload: CreateNotificationPayload,
+  ): Promise<Notification> {
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const exists = await this.prisma.notification.findFirst({
+      where: {
+        userId: payload.userId,
+        type: payload.type,
+        actionUrl: payload.actionUrl,
+        deliveryStatus: { in: ['pending', 'sent'] },
+        scheduledFor: { gte: oneDayAgo },
       },
     });
 
