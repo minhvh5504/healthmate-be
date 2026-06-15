@@ -23,6 +23,7 @@ export class UserMedicationService {
    */
   async create(createUserMedicationDto: CreateUserMedicationDto, userId: string) {
     const { schedules, frequency, selectedDays, ...medicationData } = createUserMedicationDto;
+    const isAsNeeded = frequency === 'as_needed';
 
     const medication = await this.prisma.medication.findUnique({
       where: { id: medicationData.medicationId },
@@ -50,7 +51,8 @@ export class UserMedicationService {
         data: {
           userId,
           ...medicationData,
-          reminderSchedules: schedules?.length
+          ...(isAsNeeded ? { endDate: null, reminderEnabled: false } : {}),
+          reminderSchedules: !isAsNeeded && schedules?.length
             ? {
                 create: schedules.map((s) => ({
                   remindTime: s.time,
@@ -351,9 +353,8 @@ export class UserMedicationService {
         const isDaily = schedule.repeatType === 'daily';
         const isSpecificDays =
           schedule.repeatType === 'specific_days' && schedule.repeatDays.includes(dayOfWeek);
-        const isAsNeeded = schedule.repeatType === 'as_needed';
 
-        if (!isDaily && !isSpecificDays && !isAsNeeded) continue;
+        if (!isDaily && !isSpecificDays) continue;
 
         const log = dailyLogs.find((l) => l.reminderScheduleId === schedule.id);
 
@@ -451,6 +452,7 @@ export class UserMedicationService {
    */
   async update(id: string, userId: string, updateDto: UpdateUserMedicationDto) {
     const { schedules, frequency, selectedDays, ...medicationData } = updateDto;
+    const isAsNeeded = frequency === 'as_needed';
 
     // Verify ownership
     const existing = await this.prisma.userMedication.findFirst({
@@ -478,6 +480,10 @@ export class UserMedicationService {
     const cleanMedicationData = Object.fromEntries(
       Object.entries(medicationData).filter(([, v]) => v !== undefined),
     );
+    if (isAsNeeded) {
+      cleanMedicationData.endDate = null;
+      cleanMedicationData.reminderEnabled = false;
+    }
 
     const updated = await this.prisma.$transaction(async (tx) => {
       // 1. Update basic fields (only fields that were actually provided)
@@ -486,6 +492,7 @@ export class UserMedicationService {
         data: cleanMedicationData,
       });
 
+<<<<<<< Updated upstream
       // 2. If schedules provided, update existing rows in place so medication logs
       // keep matching by reminderScheduleId after a time or quantity edit.
       if (schedules) {
@@ -501,6 +508,17 @@ export class UserMedicationService {
             id: { notIn: incomingExistingIds },
           },
           data: { isActive: false },
+=======
+      // 2. If schedules provided, replace them entirely.
+      // As-needed medicines are logged manually, so they must not keep schedules.
+      if (isAsNeeded) {
+        await tx.reminderSchedule.deleteMany({
+          where: { userMedicationId: id },
+        });
+      } else if (schedules) {
+        await tx.reminderSchedule.deleteMany({
+          where: { userMedicationId: id },
+>>>>>>> Stashed changes
         });
 
         for (const schedule of schedules) {
