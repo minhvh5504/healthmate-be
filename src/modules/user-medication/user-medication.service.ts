@@ -500,7 +500,9 @@ export class UserMedicationService {
           where: { userMedicationId: id },
         });
       } else if (schedules) {
-        const existingScheduleIds = new Set(existing.reminderSchedules.map((s) => s.id));
+        const existingSchedulesById = new Map(
+          existing.reminderSchedules.map((s) => [s.id, s]),
+        );
         const incomingExistingIds = schedules
           .map((s) => s.id)
           .filter((scheduleId): scheduleId is string => Boolean(scheduleId));
@@ -515,20 +517,35 @@ export class UserMedicationService {
         });
 
         for (const schedule of schedules) {
+          const existingSchedule = schedule.id ? existingSchedulesById.get(schedule.id) : undefined;
           const scheduleData = {
             remindTime: schedule.time,
             quantity: schedule.quantity,
             dosage: updateDto.dosage || existing.dosage,
-            repeatType: frequency || firstExistingSchedule?.repeatType || 'daily',
-            repeatDays: selectedDays || firstExistingSchedule?.repeatDays || [],
+            repeatType:
+              frequency || existingSchedule?.repeatType || firstExistingSchedule?.repeatType || 'daily',
+            repeatDays:
+              selectedDays || existingSchedule?.repeatDays || firstExistingSchedule?.repeatDays || [],
             isActive: updateDto.reminderEnabled ?? existing.reminderEnabled ?? true,
           };
 
-          if (schedule.id && existingScheduleIds.has(schedule.id)) {
-            await tx.reminderSchedule.update({
-              where: { id: schedule.id },
-              data: scheduleData,
-            });
+          if (existingSchedule) {
+            const repeatDaysChanged =
+              JSON.stringify(existingSchedule.repeatDays) !== JSON.stringify(scheduleData.repeatDays);
+            const scheduleChanged =
+              existingSchedule.remindTime !== scheduleData.remindTime ||
+              existingSchedule.quantity !== scheduleData.quantity ||
+              existingSchedule.dosage !== scheduleData.dosage ||
+              existingSchedule.repeatType !== scheduleData.repeatType ||
+              repeatDaysChanged ||
+              existingSchedule.isActive !== scheduleData.isActive;
+
+            if (scheduleChanged) {
+              await tx.reminderSchedule.update({
+                where: { id: existingSchedule.id },
+                data: scheduleData,
+              });
+            }
           } else {
             await tx.reminderSchedule.create({
               data: {

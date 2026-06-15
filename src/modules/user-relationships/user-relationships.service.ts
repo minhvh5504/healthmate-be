@@ -66,7 +66,27 @@ export class UserRelationshipsService {
       },
     });
 
-    if (existing && existing.status !== 'revoked') {
+    if (existing) {
+      if (existing.status === 'revoked') {
+        // Re-open revoked relationship
+        const updated = await this.prisma.userRelationship.update({
+          where: { id: existing.id },
+          data: {
+            userId, // Current user becomes the inviter again
+            relatedUserId: relatedUser.id,
+            status: 'pending',
+            invitedAt: new Date(),
+            acceptedAt: null,
+            revokedAt: null,
+          },
+        });
+        return ResponseHelper.success(
+          updated,
+          MessageCodes.RELATIONSHIP_INVITED,
+          'Đã gửi lời mời',
+        );
+      }
+
       throw new ConflictException(
         ResponseHelper.error(
           MessageCodes.RELATIONSHIP_ALREADY_EXISTS,
@@ -110,26 +130,6 @@ export class UserRelationshipsService {
           'This user has reached the maximum number of connections',
           400,
         ),
-      );
-    }
-
-    if (existing?.status === 'revoked') {
-      // Re-open revoked relationship
-      const updated = await this.prisma.userRelationship.update({
-        where: { id: existing.id },
-        data: {
-          userId, // Current user becomes the inviter again
-          relatedUserId: relatedUser.id,
-          status: 'pending',
-          invitedAt: new Date(),
-          acceptedAt: null,
-          revokedAt: null,
-        },
-      });
-      return ResponseHelper.success(
-        updated,
-        MessageCodes.RELATIONSHIP_INVITED,
-        'Đã gửi lời mời',
       );
     }
 

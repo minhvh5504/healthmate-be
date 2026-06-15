@@ -59,21 +59,49 @@ export interface AiTool {
 
 export type ToolExecutorFn = (name: string, args: Record<string, unknown>) => Promise<unknown>;
 
+type AiProviderName = 'cloudflare' | 'groq';
+
+interface AiProviderConfig {
+  name: AiProviderName;
+  label: string;
+  url: string;
+  token: string;
+  model: string;
+}
+
 @Injectable()
 export class CloudflareAdapter {
   private readonly logger = new Logger(CloudflareAdapter.name);
-  private readonly apiUrl: string;
-  private readonly apiToken: string;
-  private readonly model: string;
+  private readonly providers: AiProviderConfig[];
+  private providerCursor = 0;
 
   constructor(private configService: ConfigService) {
     const accountId = this.configService.get<string>('CLOUDFLARE_ACCOUNT_ID', '');
-    this.apiToken = this.configService.get<string>('CLOUDFLARE_API_TOKEN', '');
-    this.model = this.configService.get<string>(
+    const cloudflareModel = this.configService.get<string>(
       'CLOUDFLARE_AI_MODEL',
       '@cf/google/gemma-4-26b-a4b-it',
     );
-    this.apiUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run`;
+    const groqModel = this.configService.get<string>('GROQ_AI_MODEL', 'llama-3.3-70b-versatile');
+
+    const cloudflareProviders = accountId
+      ? this.getEnvList('CLOUDFLARE_API_TOKENS', 'CLOUDFLARE_API_TOKEN').map((token, index) => ({
+          name: 'cloudflare' as const,
+          label: `cloudflare#${index + 1}`,
+          url: `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${cloudflareModel}`,
+          token,
+          model: cloudflareModel,
+        }))
+      : [];
+
+    const groqProviders = this.getEnvList('GROQ_API_KEYS', 'GROQ_API_KEY').map((token, index) => ({
+      name: 'groq' as const,
+      label: `groq#${index + 1}`,
+      url: 'https://api.groq.com/openai/v1/chat/completions',
+      token,
+      model: groqModel,
+    }));
+
+    this.providers = this.orderProviders([...cloudflareProviders, ...groqProviders]);
   }
 
   async processChat(
@@ -83,7 +111,7 @@ export class CloudflareAdapter {
     tools: AiTool[],
     executeTool: ToolExecutorFn,
   ) {
-    if (!this.apiUrl || !this.apiToken) {
+    if (this.providers.length === 0) {
       subscriber.next({ text: 'Hệ thống AI chưa được cấu hình.' });
       subscriber.complete();
       return;
@@ -111,9 +139,9 @@ export class CloudflareAdapter {
 
     try {
       for (let turn = 0; turn < MAX_TOOL_TURNS; turn++) {
-        this.logger.log(`Cloudflare AI Turn ${turn + 1}...`);
+        this.logger.log(`AI turn ${turn + 1}...`);
 
-        const response = await this.callCloudflareAiStream(messages, tools);
+        const response = await this.callAiStreamWithFallback(messages, tools);
 
         if (!response.body) {
           throw new Error('Response body is null');
@@ -261,26 +289,40 @@ export class CloudflareAdapter {
       subscriber.next({ text: 'Xin lỗi, tôi không thể xử lý yêu cầu này do quá giới hạn nội bộ.' });
       subscriber.complete();
     } catch (err) {
-      this.logger.error('Error calling Cloudflare AI:', err);
+      this.logger.error('Error calling AI provider:', err);
       subscriber.next({ error: 'Lỗi kết nối tới AI Model.' });
       subscriber.complete();
     }
   }
 
-  private async callCloudflareAiStream(
+  private async callAiStreamWithFallback(messages: ChatMessage[], tools?: AiTool[]) {
+    const providers = this.getProviderRotation();
+    let lastError: unknown;
+
+    for (const provider of providers) {
+      try {
+        this.logger.log(`Calling AI provider ${provider.label}`);
+        return await this.callProviderStream(provider, messages, tools);
+      } catch (error) {
+        lastError = error;
+        this.logger.warn(`AI provider ${provider.label} failed, trying next provider`);
+      }
+    }
+
+    throw lastError instanceof Error ? lastError : new Error('Không còn provider AI khả dụng');
+  }
+
+  private async callProviderStream(
+    provider: AiProviderConfig,
     messages: ChatMessage[],
     tools?: AiTool[],
   ): Promise<Response> {
-    const body: Record<string, unknown> = {
-      messages,
-      stream: true,
-    };
-    if (tools && tools.length > 0) body.tools = tools;
+    const body = this.buildRequestBody(provider, messages, tools);
 
-    const response = await fetch(`${this.apiUrl}/${this.model}`, {
+    const response = await fetch(provider.url, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${this.apiToken}`,
+        Authorization: `Bearer ${provider.token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(body),
@@ -288,10 +330,101 @@ export class CloudflareAdapter {
 
     if (!response.ok) {
       const errorData = await response.text();
-      this.logger.error(`Cloudflare API Error: ${response.status} - ${errorData}`);
-      throw new Error(`Cloudflare API error: ${response.status} ${errorData}`);
+      this.logger.error(`${provider.label} API error: ${response.status} - ${errorData}`);
+      throw new Error(`${provider.label} API error: ${response.status}`);
     }
 
     return response;
+  }
+
+  private buildRequestBody(
+    provider: AiProviderConfig,
+    messages: ChatMessage[],
+    tools?: AiTool[],
+  ): Record<string, unknown> {
+    const body: Record<string, unknown> = {
+      messages: this.buildProviderMessages(provider, messages),
+      stream: true,
+    };
+
+    if (provider.name === 'groq') {
+      body.model = provider.model;
+    }
+
+    if (tools && tools.length > 0) {
+      body.tools = tools;
+    }
+
+    return body;
+  }
+
+  private buildProviderMessages(provider: AiProviderConfig, messages: ChatMessage[]) {
+    if (provider.name !== 'groq') {
+      return messages;
+    }
+
+    return messages.map((message) => {
+      const normalized: Record<string, unknown> = {
+        role: message.role,
+        content: message.content,
+      };
+
+      if (message.tool_call_id) {
+        normalized.tool_call_id = message.tool_call_id;
+      }
+
+      if (message.tool_calls?.length) {
+        normalized.tool_calls = message.tool_calls.map((toolCall) => ({
+          id: toolCall.id || toolCall.function.name || 'tool_call',
+          type: toolCall.type || 'function',
+          function: {
+            name: toolCall.function.name || '',
+            arguments:
+              typeof toolCall.function.arguments === 'string'
+                ? toolCall.function.arguments
+                : JSON.stringify(toolCall.function.arguments),
+          },
+        }));
+      }
+
+      return normalized;
+    });
+  }
+
+  private getProviderRotation() {
+    const providers = [...this.providers];
+    const start = this.providerCursor % providers.length;
+    this.providerCursor = (this.providerCursor + 1) % providers.length;
+
+    return [...providers.slice(start), ...providers.slice(0, start)];
+  }
+
+  private getEnvList(pluralKey: string, singleKey: string) {
+    const pluralValue = this.configService.get<string>(pluralKey, '');
+    const singleValue = this.configService.get<string>(singleKey, '');
+    const rawValue = pluralValue || singleValue;
+
+    return rawValue
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean);
+  }
+
+  private orderProviders(providers: AiProviderConfig[]) {
+    const order = this.configService
+      .get<string>('AI_PROVIDER_ORDER', 'cloudflare,groq')
+      .split(',')
+      .map((value) => value.trim().toLowerCase())
+      .filter((value): value is AiProviderName => value === 'cloudflare' || value === 'groq');
+
+    if (order.length === 0) {
+      return providers;
+    }
+
+    return providers.sort((a, b) => {
+      const left = order.indexOf(a.name);
+      const right = order.indexOf(b.name);
+      return (left === -1 ? order.length : left) - (right === -1 ? order.length : right);
+    });
   }
 }
