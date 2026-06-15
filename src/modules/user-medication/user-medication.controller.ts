@@ -134,7 +134,7 @@ export class UserMedicationController {
   @Delete(':id')
   @Roles(Role.user, Role.admin)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Soft delete a user medication' })
+  @ApiOperation({ summary: 'Delete a user medication permanently' })
   @ApiResponse({ status: 200, description: 'Deleted successfully' })
   remove(@Param('id') id: string, @Request() req) {
     return this.userMedicationService.remove(id, req.user.id);
