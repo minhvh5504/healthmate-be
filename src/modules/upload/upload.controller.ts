@@ -46,12 +46,12 @@ export class UploadController {
   })
   @ApiResponse({
     status: 201,
-    description: 'Icon uploaded successfully',
+    description: 'Tải biểu tượng lên thành công',
     schema: {
       example: {
         success: true,
         statusCode: 201,
-        message: 'Icon uploaded successfully',
+        message: 'Tải biểu tượng lên thành công',
         messageCode: 'SERVICE.CREATE.SUCCESS',
         data: {
           iconUrl: 'https://res.cloudinary.com/<cloud>/image/upload/v123/healthmate/icons/xxx.png',
@@ -71,7 +71,7 @@ export class UploadController {
     return ResponseHelper.success(
       { iconUrl: url, publicId },
       MessageCodes.SERVICE_CREATED,
-      'Icon uploaded successfully',
+      'Tải biểu tượng lên thành công',
       201,
     );
   }
@@ -99,12 +99,12 @@ export class UploadController {
   })
   @ApiResponse({
     status: 201,
-    description: 'Avatar uploaded successfully',
+    description: 'Tải ảnh đại diện lên thành công',
     schema: {
       example: {
         success: true,
         statusCode: 201,
-        message: 'Avatar uploaded successfully',
+        message: 'Tải ảnh đại diện lên thành công',
         messageCode: 'USER.AVATAR.UPLOADED',
         data: {
           url: 'https://res.cloudinary.com/<cloud>/image/upload/v123/healthmate/avatars/xxx.jpg',
@@ -128,7 +128,7 @@ export class UploadController {
     return ResponseHelper.success(
       { url, publicId },
       MessageCodes.USER_UPDATED,
-      'Avatar uploaded successfully',
+      'Tải ảnh đại diện lên thành công',
       201,
     );
   }

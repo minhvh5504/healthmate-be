@@ -46,7 +46,7 @@ export class AntiFakeMiddleware implements NestMiddleware {
         throw new HttpException(
           {
             statusCode: HttpStatus.TOO_MANY_REQUESTS,
-            message: 'Too many requests. Please try again later.',
+            message: 'Quá nhiều yêu cầu. Vui lòng thử lại sau.',
             retryAfter: Math.ceil((rateLimit.resetTime - now) / 1000),
           },
           HttpStatus.TOO_MANY_REQUESTS,

@@ -53,7 +53,7 @@ export class AiService {
         ) {
           return this.medicationTool.execute(userId, name, args);
         }
-        return { error: `Tool ${name} not found` };
+        return { error: `Không tìm thấy công cụ ${name}` };
       };
 
       let fullContent = '';

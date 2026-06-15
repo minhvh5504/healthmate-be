@@ -17,7 +17,7 @@ export class ReminderSchedulesService {
 
     if (!userMedication) {
       throw new NotFoundException(
-        ResponseHelper.error(MessageCodes.MEDICATION_NOT_FOUND, 'User medication not found', 404),
+        ResponseHelper.error(MessageCodes.MEDICATION_NOT_FOUND, 'Không tìm thấy thuốc của người dùng', 404),
       );
     }
 
@@ -25,7 +25,7 @@ export class ReminderSchedulesService {
       throw new ForbiddenException(
         ResponseHelper.error(
           MessageCodes.INSUFFICIENT_PERMISSIONS,
-          'Insufficient permissions',
+          'Bạn không có đủ quyền',
           403,
         ),
       );
@@ -39,7 +39,7 @@ export class ReminderSchedulesService {
     return ResponseHelper.success(
       schedule,
       MessageCodes.REMINDER_SCHEDULE_CREATED,
-      'Reminder schedule created successfully',
+      'Tạo lịch nhắc thành công',
     );
   }
 
@@ -53,7 +53,7 @@ export class ReminderSchedulesService {
       throw new NotFoundException(
         ResponseHelper.error(
           MessageCodes.MEDICATION_NOT_FOUND,
-          'User medication not found or access denied',
+          'Không tìm thấy thuốc của người dùng hoặc bạn không có quyền truy cập',
           404,
         ),
       );
@@ -67,7 +67,7 @@ export class ReminderSchedulesService {
     return ResponseHelper.success(
       schedules,
       MessageCodes.REMINDER_SCHEDULE_LIST_RETRIEVED,
-      'Reminder schedules retrieved successfully',
+      'Lấy danh sách lịch nhắc thành công',
     );
   }
 
@@ -81,7 +81,7 @@ export class ReminderSchedulesService {
       throw new NotFoundException(
         ResponseHelper.error(
           MessageCodes.REMINDER_SCHEDULE_NOT_FOUND,
-          'Reminder schedule not found',
+          'Không tìm thấy lịch nhắc',
           404,
         ),
       );
@@ -91,7 +91,7 @@ export class ReminderSchedulesService {
       throw new ForbiddenException(
         ResponseHelper.error(
           MessageCodes.INSUFFICIENT_PERMISSIONS,
-          'Insufficient permissions',
+          'Bạn không có đủ quyền',
           403,
         ),
       );
@@ -105,7 +105,7 @@ export class ReminderSchedulesService {
     return ResponseHelper.success(
       updated,
       MessageCodes.REMINDER_SCHEDULE_UPDATED,
-      'Reminder schedule updated successfully',
+      'Cập nhật lịch nhắc thành công',
     );
   }
 
@@ -119,7 +119,7 @@ export class ReminderSchedulesService {
       throw new NotFoundException(
         ResponseHelper.error(
           MessageCodes.REMINDER_SCHEDULE_NOT_FOUND,
-          'Reminder schedule not found',
+          'Không tìm thấy lịch nhắc',
           404,
         ),
       );
@@ -129,7 +129,7 @@ export class ReminderSchedulesService {
       throw new ForbiddenException(
         ResponseHelper.error(
           MessageCodes.INSUFFICIENT_PERMISSIONS,
-          'Insufficient permissions',
+          'Bạn không có đủ quyền',
           403,
         ),
       );
@@ -142,7 +142,7 @@ export class ReminderSchedulesService {
     return ResponseHelper.success(
       null,
       MessageCodes.REMINDER_SCHEDULE_DELETED,
-      'Reminder schedule deleted successfully',
+      'Xóa lịch nhắc thành công',
     );
   }
 }

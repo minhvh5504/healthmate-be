@@ -6,7 +6,7 @@ export class LoginDto {
     example: 'user@example.com',
     description: 'User email address',
   })
-  @IsEmail({}, { message: 'Invalid email address' })
+  @IsEmail({}, { message: 'Email không hợp lệ' })
   email: string;
 
   @ApiProperty({
@@ -14,6 +14,6 @@ export class LoginDto {
     description: 'User password',
   })
   @IsString()
-  @MinLength(6, { message: 'Password must be at least 6 characters' })
+  @MinLength(6, { message: 'Mật khẩu phải có ít nhất 6 ký tự' })
   password: string;
 }

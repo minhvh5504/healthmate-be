@@ -150,7 +150,7 @@ export class MailService {
         acceptUrl,
       });
 
-      const subject = `🔗 Connection Request from ${data.inviterName} - Healthmate`;
+      const subject = `🔗 Lời mời kết nối từ ${data.inviterName} - Healthmate`;
 
       await this.sendMail(data.toEmail, subject, html);
     } catch (error) {

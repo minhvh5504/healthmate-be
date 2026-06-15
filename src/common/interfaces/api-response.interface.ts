@@ -13,7 +13,7 @@ export class ResponseHelper {
   static success<T>(
     data: T,
     messageCode: string = 'SUCCESS',
-    message: string = 'Operation successful',
+    message: string = 'Thao tác thành công',
     statusCode: number = 200,
   ): ApiResponse<T> {
     return {
@@ -30,7 +30,7 @@ export class ResponseHelper {
     errorCode: string,
     errorMessage: string,
     statusCode: number = 400,
-    message: string = 'Operation failed',
+    message: string = 'Thao tác thất bại',
   ): ApiResponse {
     return {
       success: false,

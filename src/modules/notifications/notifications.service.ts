@@ -99,7 +99,7 @@ export class NotificationsService {
     });
 
     if (!notification) {
-      throw new NotFoundException('Notification not found');
+      throw new NotFoundException('Không tìm thấy thông báo');
     }
 
     return notification;
@@ -199,7 +199,7 @@ export class NotificationsService {
         where: { id },
         data: {
           deliveryStatus: 'cancelled',
-          failureReason: 'Medication reminder is disabled',
+          failureReason: 'Lời nhắc uống thuốc đã bị tắt',
         },
       });
       return;
@@ -235,7 +235,7 @@ export class NotificationsService {
     });
 
     if (!notification) {
-      throw new NotFoundException('Notification not found');
+      throw new NotFoundException('Không tìm thấy thông báo');
     }
 
     return await this.prisma.notification.delete({ where: { id } });
@@ -322,8 +322,8 @@ export class NotificationsService {
       userId: payload.ownerUserId,
       reminderScheduleId: payload.reminderScheduleId,
       type: 'medication_reminder',
-      title: 'Medication Reminder',
-      body: `You have a scheduled dose of ${medicationDose} in 1 hour.`,
+      title: 'Nhắc uống thuốc',
+      body: `Bạn có lịch uống ${medicationDose} sau 1 giờ.`,
       scheduledFor: payload.scheduledFor,
       iconType: 'medication',
       fcmData: {
@@ -338,8 +338,8 @@ export class NotificationsService {
           userId: relatedUserId,
           reminderScheduleId: payload.reminderScheduleId,
           type: 'medication_reminder',
-          title: 'Medication Reminder',
-          body: `Please remind ${ownerDisplayName} to take ${medicationDose} in 1 hour.`,
+          title: 'Nhắc uống thuốc',
+          body: `Vui lòng nhắc ${ownerDisplayName} uống ${medicationDose} sau 1 giờ.`,
           scheduledFor: payload.scheduledFor,
           iconType: 'medication',
           fcmData: {
@@ -374,8 +374,8 @@ export class NotificationsService {
     const ownerNotification = await this.createMedicationStockReminderIfNotExists({
       userId: payload.ownerUserId,
       type: 'low_stock_reminder',
-      title: 'Medication Stock Reminder',
-      body: `${payload.medicationName} is running low (${payload.stockCount} left).`,
+      title: 'Nhắc bổ sung thuốc',
+      body: `${payload.medicationName} sắp hết, chỉ còn ${payload.stockCount}.`,
       scheduledFor: new Date(),
       iconType: 'medication',
       actionUrl,
@@ -390,8 +390,8 @@ export class NotificationsService {
         this.createMedicationStockReminderIfNotExists({
           userId: relatedUserId,
           type: 'low_stock_reminder',
-          title: 'Medication Stock Reminder',
-          body: `${ownerDisplayName} is running low on ${payload.medicationName} (${payload.stockCount} left).`,
+          title: 'Nhắc bổ sung thuốc',
+          body: `${ownerDisplayName} sắp hết ${payload.medicationName}, chỉ còn ${payload.stockCount}.`,
           scheduledFor: new Date(),
           iconType: 'medication',
           actionUrl,
@@ -425,7 +425,7 @@ export class NotificationsService {
       },
       data: {
         deliveryStatus: 'cancelled',
-        failureReason: 'Medication reminder is disabled',
+        failureReason: 'Lời nhắc uống thuốc đã bị tắt',
       },
     });
   }
@@ -529,7 +529,7 @@ export class NotificationsService {
       },
     });
 
-    return user?.profile?.fullName || user?.username || user?.email || 'your family member';
+    return user?.profile?.fullName || user?.username || user?.email || 'người thân của bạn';
   }
 
   private formatMedicationDose(dosage: string | null | undefined, medicationName: string) {
