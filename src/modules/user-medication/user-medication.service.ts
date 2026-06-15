@@ -492,10 +492,14 @@ export class UserMedicationService {
         data: cleanMedicationData,
       });
 
-<<<<<<< Updated upstream
       // 2. If schedules provided, update existing rows in place so medication logs
       // keep matching by reminderScheduleId after a time or quantity edit.
-      if (schedules) {
+      // As-needed medicines are logged manually, so they must not keep schedules.
+      if (isAsNeeded) {
+        await tx.reminderSchedule.deleteMany({
+          where: { userMedicationId: id },
+        });
+      } else if (schedules) {
         const existingScheduleIds = new Set(existing.reminderSchedules.map((s) => s.id));
         const incomingExistingIds = schedules
           .map((s) => s.id)
@@ -508,17 +512,6 @@ export class UserMedicationService {
             id: { notIn: incomingExistingIds },
           },
           data: { isActive: false },
-=======
-      // 2. If schedules provided, replace them entirely.
-      // As-needed medicines are logged manually, so they must not keep schedules.
-      if (isAsNeeded) {
-        await tx.reminderSchedule.deleteMany({
-          where: { userMedicationId: id },
-        });
-      } else if (schedules) {
-        await tx.reminderSchedule.deleteMany({
-          where: { userMedicationId: id },
->>>>>>> Stashed changes
         });
 
         for (const schedule of schedules) {
