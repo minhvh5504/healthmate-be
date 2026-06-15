@@ -66,31 +66,7 @@ export class UserRelationshipsService {
       },
     });
 
-<<<<<<< Updated upstream
-    if (existing) {
-      if (existing.status === 'revoked') {
-        // Re-open revoked relationship
-        const updated = await this.prisma.userRelationship.update({
-          where: { id: existing.id },
-          data: {
-            userId, // Current user becomes the inviter again
-            relatedUserId: relatedUser.id,
-            status: 'pending',
-            invitedAt: new Date(),
-            acceptedAt: null,
-            revokedAt: null,
-          },
-        });
-        return ResponseHelper.success(
-          updated,
-          MessageCodes.RELATIONSHIP_INVITED,
-          'Đã gửi lời mời',
-        );
-      }
-
-=======
     if (existing && existing.status !== 'revoked') {
->>>>>>> Stashed changes
       throw new ConflictException(
         ResponseHelper.error(
           MessageCodes.RELATIONSHIP_ALREADY_EXISTS,
@@ -153,7 +129,7 @@ export class UserRelationshipsService {
       return ResponseHelper.success(
         updated,
         MessageCodes.RELATIONSHIP_INVITED,
-        'Invitation sent',
+        'Đã gửi lời mời',
       );
     }
 
