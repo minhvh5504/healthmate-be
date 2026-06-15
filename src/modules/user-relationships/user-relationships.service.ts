@@ -66,6 +66,7 @@ export class UserRelationshipsService {
       },
     });
 
+<<<<<<< Updated upstream
     if (existing) {
       if (existing.status === 'revoked') {
         // Re-open revoked relationship
@@ -87,12 +88,72 @@ export class UserRelationshipsService {
         );
       }
 
+=======
+    if (existing && existing.status !== 'revoked') {
+>>>>>>> Stashed changes
       throw new ConflictException(
         ResponseHelper.error(
           MessageCodes.RELATIONSHIP_ALREADY_EXISTS,
           'Mối liên kết giữa hai người dùng này đã tồn tại',
           409,
         ),
+      );
+    }
+
+    const maxActiveRelationships = 5;
+    const activeStatuses = ['pending', 'accepted'];
+    const [currentUserRelationshipCount, relatedUserRelationshipCount] = await Promise.all([
+      this.prisma.userRelationship.count({
+        where: {
+          status: { in: activeStatuses },
+          OR: [{ userId }, { relatedUserId: userId }],
+        },
+      }),
+      this.prisma.userRelationship.count({
+        where: {
+          status: { in: activeStatuses },
+          OR: [{ userId: relatedUser.id }, { relatedUserId: relatedUser.id }],
+        },
+      }),
+    ]);
+
+    if (currentUserRelationshipCount >= maxActiveRelationships) {
+      throw new BadRequestException(
+        ResponseHelper.error(
+          'RELATIONSHIP.LIMIT_REACHED',
+          `You can only connect up to ${maxActiveRelationships} supporters`,
+          400,
+        ),
+      );
+    }
+
+    if (relatedUserRelationshipCount >= maxActiveRelationships) {
+      throw new BadRequestException(
+        ResponseHelper.error(
+          'RELATIONSHIP.RELATED_USER_LIMIT_REACHED',
+          'This user has reached the maximum number of connections',
+          400,
+        ),
+      );
+    }
+
+    if (existing?.status === 'revoked') {
+      // Re-open revoked relationship
+      const updated = await this.prisma.userRelationship.update({
+        where: { id: existing.id },
+        data: {
+          userId, // Current user becomes the inviter again
+          relatedUserId: relatedUser.id,
+          status: 'pending',
+          invitedAt: new Date(),
+          acceptedAt: null,
+          revokedAt: null,
+        },
+      });
+      return ResponseHelper.success(
+        updated,
+        MessageCodes.RELATIONSHIP_INVITED,
+        'Invitation sent',
       );
     }
 
