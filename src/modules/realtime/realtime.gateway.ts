@@ -118,12 +118,12 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
    */
   @SubscribeMessage('join:user')
   async handleJoinUser(@ConnectedSocket() client: Socket, @MessageBody() data: { userId: string }) {
-    if (!data?.userId) return { event: 'error', message: 'userId is required' };
+    if (!data?.userId) return { event: 'error', message: 'Vui lòng cung cấp userId' };
 
     // Security: only allow joining own room
     const socketUserId = (client.data as Record<string, string>).userId;
     if (socketUserId && socketUserId !== data.userId) {
-      return { event: 'error', message: 'Unauthorized' };
+      return { event: 'error', message: 'Không được phép truy cập' };
     }
 
     const room = `user:${data.userId}`;

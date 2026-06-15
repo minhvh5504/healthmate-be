@@ -25,18 +25,18 @@ export class ProfileService {
     if (!user) {
       throw new ApiException(
         MessageCodes.USER_NOT_FOUND,
-        'User not found',
+        'Không tìm thấy người dùng',
         404,
-        'Profile retrieval failed',
+        'Lấy hồ sơ thất bại',
       );
     }
 
     if (!user.isActive) {
       throw new ApiException(
         MessageCodes.ACCOUNT_DISABLED,
-        'Your account has been deactivated/blocked. Please contact admin to unlock your account.',
+        'Tài khoản của bạn đã bị vô hiệu hóa hoặc khóa. Vui lòng liên hệ quản trị viên để mở khóa.',
         401,
-        'Profile retrieval failed',
+        'Lấy hồ sơ thất bại',
       );
     }
 
@@ -121,7 +121,7 @@ export class ProfileService {
     return ResponseHelper.success(
       result,
       MessageCodes.PROFILE_RETRIEVED,
-      'Profile retrieved successfully',
+      'Lấy hồ sơ thành công',
       200,
     );
   }
@@ -144,18 +144,18 @@ export class ProfileService {
     if (!user) {
       throw new ApiException(
         MessageCodes.USER_NOT_FOUND,
-        'User not found',
+        'Không tìm thấy người dùng',
         404,
-        'Profile update failed',
+        'Cập nhật hồ sơ thất bại',
       );
     }
 
     if (!user.isActive) {
       throw new ApiException(
         MessageCodes.ACCOUNT_DISABLED,
-        'Your account has been deactivated/blocked. Please contact admin to unlock your account.',
+        'Tài khoản của bạn đã bị vô hiệu hóa hoặc khóa. Vui lòng liên hệ quản trị viên để mở khóa.',
         401,
-        'Profile update failed',
+        'Cập nhật hồ sơ thất bại',
       );
     }
 
@@ -218,7 +218,7 @@ export class ProfileService {
     return ResponseHelper.success(
       updatedProfile,
       MessageCodes.USER_UPDATED,
-      'Profile updated successfully',
+      'Cập nhật hồ sơ thành công',
       200,
     );
   }
@@ -235,9 +235,9 @@ export class ProfileService {
     if (!user || !user.profile) {
       throw new ApiException(
         MessageCodes.USER_NOT_FOUND,
-        'User profile not found',
+        'Không tìm thấy hồ sơ người dùng',
         404,
-        'Health analysis failed',
+        'Phân tích sức khỏe thất bại',
       );
     }
 
@@ -253,7 +253,7 @@ export class ProfileService {
           status: 'INCOMPLETE_DATA',
         },
         MessageCodes.PROFILE_RETRIEVED,
-        'Incomplete profile data for analysis',
+        'Chưa đủ dữ liệu hồ sơ để phân tích',
         200,
       );
     }
@@ -270,7 +270,7 @@ export class ProfileService {
           status: 'INCOMPLETE_DATA',
         },
         MessageCodes.PROFILE_RETRIEVED,
-        'Incomplete profile data for analysis',
+        'Chưa đủ dữ liệu hồ sơ để phân tích',
         200,
       );
     }
@@ -299,7 +299,7 @@ export class ProfileService {
           status: 'NO_BENCHMARK_FOUND',
         },
         MessageCodes.PROFILE_RETRIEVED,
-        'No benchmark found for your age/gender',
+        'Chưa có dữ liệu tham chiếu phù hợp với tuổi/giới tính của bạn',
         200,
       );
     }
@@ -323,7 +323,7 @@ export class ProfileService {
     return ResponseHelper.success(
       result,
       MessageCodes.PROFILE_RETRIEVED,
-      'Health analysis retrieved successfully',
+      'Lấy phân tích sức khỏe thành công',
       200,
     );
   }
@@ -363,7 +363,7 @@ export class ProfileService {
         limit,
       },
       MessageCodes.USER_LIST_RETRIEVED,
-      'User list retrieved successfully',
+      'Lấy danh sách người dùng thành công',
       200,
     );
   }
@@ -385,9 +385,9 @@ export class ProfileService {
     if (!user) {
       throw new ApiException(
         MessageCodes.USER_NOT_FOUND,
-        'User not found',
+        'Không tìm thấy người dùng',
         404,
-        'User retrieval failed',
+        'Lấy thông tin người dùng thất bại',
       );
     }
 
@@ -397,7 +397,7 @@ export class ProfileService {
     return ResponseHelper.success(
       userData,
       MessageCodes.USER_RETRIEVED,
-      'User details retrieved successfully',
+      'Lấy chi tiết người dùng thành công',
       200,
     );
   }
@@ -413,9 +413,9 @@ export class ProfileService {
     if (!user) {
       throw new ApiException(
         MessageCodes.USER_NOT_FOUND,
-        'User not found',
+        'Không tìm thấy người dùng',
         404,
-        'Status toggle failed',
+        'Cập nhật trạng thái thất bại',
       );
     }
 
@@ -427,7 +427,7 @@ export class ProfileService {
     return ResponseHelper.success(
       { isActive: updatedUser.isActive },
       MessageCodes.USER_UPDATED,
-      `User ${updatedUser.isActive ? 'activated' : 'deactivated'} successfully`,
+      `Đã ${updatedUser.isActive ? 'kích hoạt' : 'vô hiệu hóa'} người dùng thành công`,
       200,
     );
   }
@@ -443,9 +443,9 @@ export class ProfileService {
     if (!user) {
       throw new ApiException(
         MessageCodes.USER_NOT_FOUND,
-        'User not found',
+        'Không tìm thấy người dùng',
         404,
-        'User deletion failed',
+        'Xóa người dùng thất bại',
       );
     }
 
@@ -456,7 +456,7 @@ export class ProfileService {
     return ResponseHelper.success(
       null,
       MessageCodes.USER_DELETED,
-      'User deleted successfully',
+      'Xóa người dùng thành công',
       200,
     );
   }

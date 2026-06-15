@@ -119,9 +119,9 @@ export class AuthService {
     if (existingUser) {
       throw new ApiException(
         MessageCodes.EMAIL_ALREADY_EXISTS,
-        'Email already registered',
+        'Email đã được đăng ký',
         409,
-        'Register failed',
+        'Đăng ký thất bại',
       );
     }
 
@@ -159,7 +159,7 @@ export class AuthService {
     return ResponseHelper.success(
       { email },
       MessageCodes.REGISTER_SUCCESS,
-      'Register successfully! Please check your email to verify your account.',
+      'Đăng ký thành công! Vui lòng kiểm tra email để xác minh tài khoản.',
       201,
     );
   }
@@ -179,18 +179,18 @@ export class AuthService {
     if (!user) {
       throw new ApiException(
         MessageCodes.USER_NOT_FOUND,
-        'User not found',
+        'Không tìm thấy người dùng',
         404,
-        'Verification failed',
+        'Xác minh thất bại',
       );
     }
 
     if (!user.isActive) {
       throw new ApiException(
         MessageCodes.ACCOUNT_DISABLED,
-        'Your account has been deactivated/blocked. Please contact admin to unlock your account.',
+        'Tài khoản của bạn đã bị vô hiệu hóa hoặc khóa. Vui lòng liên hệ quản trị viên để mở khóa.',
         401,
-        'Verification failed',
+        'Xác minh thất bại',
       );
     }
 
@@ -203,9 +203,9 @@ export class AuthService {
     if (!storedCode || storedCode !== code) {
       throw new ApiException(
         MessageCodes.INVALID_OTP,
-        'Invalid or expired verification code',
+        'Mã xác minh không hợp lệ hoặc đã hết hạn',
         400,
-        'Verification failed',
+        'Xác minh thất bại',
       );
     }
 
@@ -237,7 +237,7 @@ export class AuthService {
           ...tokens,
         },
         MessageCodes.VERIFY_SUCCESS,
-        'Email verified successfully!',
+        'Xác minh email thành công!',
         200,
       );
     }
@@ -262,7 +262,7 @@ export class AuthService {
     return ResponseHelper.success(
       { email, resetToken },
       MessageCodes.VERIFY_SUCCESS,
-      'OTP verified successfully! You can now reset your password.',
+      'Xác minh OTP thành công! Bạn có thể đặt lại mật khẩu.',
       200,
     );
   }
@@ -281,9 +281,9 @@ export class AuthService {
     if (!user) {
       throw new ApiException(
         MessageCodes.USER_NOT_FOUND,
-        'User not found',
+        'Không tìm thấy người dùng',
         404,
-        'Resend OTP failed',
+        'Gửi lại OTP thất bại',
       );
     }
 
@@ -293,9 +293,9 @@ export class AuthService {
     if (type === 'account' && user.emailVerified) {
       throw new ApiException(
         MessageCodes.ALREADY_VERIFIED,
-        'Email already verified',
+        'Email đã được xác minh',
         400,
-        'Resend OTP failed',
+        'Gửi lại OTP thất bại',
       );
     }
 
@@ -312,7 +312,7 @@ export class AuthService {
     return ResponseHelper.success(
       { email },
       MessageCodes.RESEND_OTP_SUCCESS,
-      'OTP code has been resent to your email!',
+      'Mã OTP đã được gửi lại đến email của bạn!',
       200,
     );
   }
@@ -332,9 +332,9 @@ export class AuthService {
     if (!user) {
       throw new ApiException(
         MessageCodes.INVALID_CREDENTIALS,
-        'Email or password is incorrect',
+        'Email hoặc mật khẩu không chính xác',
         401,
-        'Login failed',
+        'Đăng nhập thất bại',
       );
     }
 
@@ -342,9 +342,9 @@ export class AuthService {
     if (!user.isActive) {
       throw new ApiException(
         MessageCodes.ACCOUNT_DISABLED,
-        'Your account has been deactivated/blocked. Please contact admin to unlock your account.',
+        'Tài khoản của bạn đã bị vô hiệu hóa hoặc khóa. Vui lòng liên hệ quản trị viên để mở khóa.',
         401,
-        'Login failed',
+        'Đăng nhập thất bại',
       );
     }
 
@@ -353,9 +353,9 @@ export class AuthService {
       const remainingMinutes = Math.ceil((user.lockedUntil.getTime() - Date.now()) / (1000 * 60));
       throw new ApiException(
         MessageCodes.ACCOUNT_LOCKED,
-        `Your account has been locked for 30 minutes due to 5 failed login attempts. Please wait ${remainingMinutes} more minutes.`,
+        `Tài khoản của bạn đã bị khóa 30 phút do đăng nhập sai 5 lần. Vui lòng chờ thêm ${remainingMinutes} phút.`,
         401,
-        'Login failed',
+        'Đăng nhập thất bại',
       );
     }
 
@@ -363,9 +363,9 @@ export class AuthService {
     if (!user.emailVerified) {
       throw new ApiException(
         MessageCodes.ACCOUNT_NOT_VERIFIED,
-        'Please verify your email address first',
+        'Vui lòng xác minh email trước',
         401,
-        'Login failed',
+        'Đăng nhập thất bại',
       );
     }
 
@@ -373,9 +373,9 @@ export class AuthService {
     if (!user.password) {
       throw new ApiException(
         MessageCodes.INVALID_CREDENTIALS,
-        'This account was registered via OAuth. Please log in with Google.',
+        'Tài khoản này được đăng ký qua OAuth. Vui lòng đăng nhập bằng Google.',
         401,
-        'Login failed',
+        'Đăng nhập thất bại',
       );
     }
 
@@ -397,9 +397,9 @@ export class AuthService {
         });
         throw new ApiException(
           MessageCodes.ACCOUNT_LOCKED,
-          'Your account has been locked for 30 minutes due to 5 failed login attempts.',
+          'Tài khoản của bạn đã bị khóa 30 phút do đăng nhập sai 5 lần.',
           401,
-          'Login failed',
+          'Đăng nhập thất bại',
         );
       } else {
         await this.prisma.user.update({
@@ -408,9 +408,9 @@ export class AuthService {
         });
         throw new ApiException(
           MessageCodes.INVALID_CREDENTIALS,
-          'Email or password is incorrect',
+          'Email hoặc mật khẩu không chính xác',
           401,
-          'Login failed',
+          'Đăng nhập thất bại',
         );
       }
     }
@@ -435,7 +435,7 @@ export class AuthService {
         ...tokens,
       },
       MessageCodes.LOGIN_SUCCESS,
-      'Login successfully!',
+      'Đăng nhập thành công!',
       200,
     );
   }
@@ -498,9 +498,9 @@ export class AuthService {
     if (!user.isActive) {
       throw new ApiException(
         MessageCodes.ACCOUNT_DISABLED,
-        'Your account has been deactivated/blocked. Please contact admin to unlock your account.',
+        'Tài khoản của bạn đã bị vô hiệu hóa hoặc khóa. Vui lòng liên hệ quản trị viên để mở khóa.',
         401,
-        'Login failed',
+        'Đăng nhập thất bại',
       );
     }
 
@@ -516,7 +516,7 @@ export class AuthService {
         ...tokens,
       },
       MessageCodes.LOGIN_SUCCESS,
-      'Login with Google successfully!',
+      'Đăng nhập bằng Google thành công!',
       200,
     );
   }
@@ -542,9 +542,9 @@ export class AuthService {
       if (!storedToken || storedToken.isRevoked) {
         throw new ApiException(
           MessageCodes.INVALID_REFRESH_TOKEN,
-          'Invalid refresh token',
+          'Refresh token không hợp lệ',
           401,
-          'Token refresh failed',
+          'Làm mới token thất bại',
         );
       }
 
@@ -552,9 +552,9 @@ export class AuthService {
       if (!storedToken.user.isActive) {
         throw new ApiException(
           MessageCodes.ACCOUNT_DISABLED,
-          'Your account has been deactivated/blocked by admin',
+          'Tài khoản của bạn đã bị quản trị viên vô hiệu hóa hoặc khóa',
           401,
-          'Token refresh failed',
+          'Làm mới token thất bại',
         );
       }
 
@@ -562,9 +562,9 @@ export class AuthService {
       if (new Date() > storedToken.expiresAt) {
         throw new ApiException(
           MessageCodes.REFRESH_TOKEN_EXPIRED,
-          'Refresh token has expired',
+          'Refresh token đã hết hạn',
           401,
-          'Token refresh failed',
+          'Làm mới token thất bại',
         );
       }
 
@@ -580,15 +580,15 @@ export class AuthService {
       return ResponseHelper.success(
         tokens,
         MessageCodes.REFRESH_SUCCESS,
-        'Token refreshed successfully',
+        'Làm mới token thành công',
         200,
       );
     } catch {
       throw new ApiException(
         MessageCodes.INVALID_REFRESH_TOKEN,
-        'Invalid or expired refresh token',
+        'Refresh token không hợp lệ hoặc đã hết hạn',
         401,
-        'Token refresh failed',
+        'Làm mới token thất bại',
       );
     }
   }
@@ -608,18 +608,18 @@ export class AuthService {
     if (!user) {
       throw new ApiException(
         MessageCodes.USER_NOT_FOUND,
-        'User with this email does not exist!',
+        'Không tồn tại người dùng với email này!',
         404,
-        'Forgot password failed',
+        'Quên mật khẩu thất bại',
       );
     }
 
     if (!user.isActive) {
       throw new ApiException(
         MessageCodes.ACCOUNT_DISABLED,
-        'Your account has been deactivated/blocked. Please contact admin to unlock your account.',
+        'Tài khoản của bạn đã bị vô hiệu hóa hoặc khóa. Vui lòng liên hệ quản trị viên để mở khóa.',
         401,
-        'Forgot password failed',
+        'Quên mật khẩu thất bại',
       );
     }
 
@@ -632,7 +632,7 @@ export class AuthService {
     return ResponseHelper.success(
       { email },
       MessageCodes.FORGOT_PASSWORD_SUCCESS,
-      'Otp reset password has been sent to email!',
+      'OTP đặt lại mật khẩu đã được gửi đến email!',
       200,
     );
   }
@@ -652,14 +652,14 @@ export class AuthService {
 
       // Check token type
       if (payload.type !== 'RESET_PASSWORD') {
-        throw new Error('Invalid token type');
+        throw new Error('Loại token không hợp lệ');
       }
     } catch (error) {
       throw new ApiException(
         MessageCodes.INVALID_TOKEN,
-        'Invalid or expired reset token',
+        'Token đặt lại mật khẩu không hợp lệ hoặc đã hết hạn',
         400,
-        'Reset password failed',
+        'Đặt lại mật khẩu thất bại',
       );
     }
 
@@ -674,18 +674,18 @@ export class AuthService {
     if (!user) {
       throw new ApiException(
         MessageCodes.USER_NOT_FOUND,
-        'User not found',
+        'Không tìm thấy người dùng',
         404,
-        'Reset password failed',
+        'Đặt lại mật khẩu thất bại',
       );
     }
 
     if (!user.isActive) {
       throw new ApiException(
         MessageCodes.ACCOUNT_DISABLED,
-        'Your account has been deactivated/blocked. Please contact admin to unlock your account.',
+        'Tài khoản của bạn đã bị vô hiệu hóa hoặc khóa. Vui lòng liên hệ quản trị viên để mở khóa.',
         401,
-        'Reset password failed',
+        'Đặt lại mật khẩu thất bại',
       );
     }
 
@@ -695,9 +695,9 @@ export class AuthService {
       if (isSamePassword) {
         throw new ApiException(
           MessageCodes.SAME_PASSWORD,
-          'New password cannot be the same as the old password. Please choose a different password.',
+          'Mật khẩu mới không được trùng với mật khẩu cũ. Vui lòng chọn mật khẩu khác.',
           400,
-          'Reset password failed',
+          'Đặt lại mật khẩu thất bại',
         );
       }
     }
@@ -725,7 +725,7 @@ export class AuthService {
     return ResponseHelper.success(
       null,
       MessageCodes.RESET_PASSWORD_SUCCESS,
-      'Password has been reset successfully!',
+      'Đặt lại mật khẩu thành công!',
       200,
     );
   }
@@ -742,7 +742,7 @@ export class AuthService {
     return ResponseHelper.success(
       null,
       MessageCodes.LOGOUT_SUCCESS,
-      'Logged out successfully',
+      'Đăng xuất thành công',
       200,
     );
   }
@@ -777,11 +777,11 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new UnauthorizedException('User not found');
+      throw new UnauthorizedException('Không tìm thấy người dùng');
     }
 
     if (!user.isActive) {
-      throw new UnauthorizedException('Account is deactivated');
+      throw new UnauthorizedException('Tài khoản đã bị vô hiệu hóa');
     }
 
     return user;
@@ -801,9 +801,9 @@ export class AuthService {
     if (!user) {
       throw new ApiException(
         MessageCodes.USER_NOT_FOUND,
-        'User not found',
+        'Không tìm thấy người dùng',
         404,
-        'Change password failed',
+        'Đổi mật khẩu thất bại',
       );
     }
 
@@ -811,9 +811,9 @@ export class AuthService {
     if (!user.password) {
       throw new ApiException(
         MessageCodes.OAUTH_NO_PASSWORD,
-        'This account was registered via OAuth and does not have a password. Please use Google to sign in.',
+        'Tài khoản này được đăng ký qua OAuth và không có mật khẩu. Vui lòng đăng nhập bằng Google.',
         400,
-        'Change password failed',
+        'Đổi mật khẩu thất bại',
       );
     }
 
@@ -823,9 +823,9 @@ export class AuthService {
     if (!isCurrentPasswordValid) {
       throw new ApiException(
         MessageCodes.WRONG_CURRENT_PASSWORD,
-        'Current password is incorrect',
+        'Mật khẩu hiện tại không chính xác',
         400,
-        'Change password failed',
+        'Đổi mật khẩu thất bại',
       );
     }
 
@@ -834,9 +834,9 @@ export class AuthService {
     if (isSamePassword) {
       throw new ApiException(
         MessageCodes.SAME_PASSWORD,
-        'New password cannot be the same as the current password. Please choose a different password.',
+        'Mật khẩu mới không được trùng với mật khẩu hiện tại. Vui lòng chọn mật khẩu khác.',
         400,
-        'Change password failed',
+        'Đổi mật khẩu thất bại',
       );
     }
 
@@ -850,7 +850,7 @@ export class AuthService {
     return ResponseHelper.success(
       null,
       MessageCodes.CHANGE_PASSWORD_SUCCESS,
-      'Password changed successfully!',
+      'Đổi mật khẩu thành công!',
       200,
     );
   }

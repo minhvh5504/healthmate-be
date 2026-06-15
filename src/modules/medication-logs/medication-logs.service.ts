@@ -26,7 +26,7 @@ export class MedicationLogsService {
       throw new ForbiddenException(
         ResponseHelper.error(
           MessageCodes.MEDICATION_NOT_FOUND,
-          'User medication not found or access denied',
+          'Không tìm thấy thuốc của người dùng hoặc bạn không có quyền truy cập',
           403,
         ),
       );
@@ -103,7 +103,7 @@ export class MedicationLogsService {
     return ResponseHelper.success(
       log,
       MessageCodes.MEDICATION_LOG_CREATED,
-      'Medication log recorded successfully',
+      'Ghi nhận lịch sử uống thuốc thành công',
     );
   }
 
@@ -194,7 +194,7 @@ export class MedicationLogsService {
     return ResponseHelper.success(
       logsWithNumericQuantity,
       MessageCodes.MEDICATION_LOG_LIST_RETRIEVED,
-      'Medication logs retrieved successfully',
+      'Lấy lịch sử uống thuốc thành công',
     );
   }
 
@@ -208,7 +208,7 @@ export class MedicationLogsService {
       throw new NotFoundException(
         ResponseHelper.error(
           MessageCodes.MEDICATION_LOG_NOT_FOUND,
-          'Medication log not found',
+          'Không tìm thấy lịch sử uống thuốc',
           404,
         ),
       );
@@ -218,7 +218,7 @@ export class MedicationLogsService {
       throw new ForbiddenException(
         ResponseHelper.error(
           MessageCodes.INSUFFICIENT_PERMISSIONS,
-          'Insufficient permissions',
+          'Bạn không có đủ quyền',
           403,
         ),
       );
@@ -232,7 +232,7 @@ export class MedicationLogsService {
     return ResponseHelper.success(
       updated,
       MessageCodes.MEDICATION_LOG_UPDATED,
-      'Medication log updated successfully',
+      'Cập nhật lịch sử uống thuốc thành công',
     );
   }
 
@@ -246,7 +246,7 @@ export class MedicationLogsService {
       throw new NotFoundException(
         ResponseHelper.error(
           MessageCodes.MEDICATION_LOG_NOT_FOUND,
-          'Medication log not found',
+          'Không tìm thấy lịch sử uống thuốc',
           404,
         ),
       );
@@ -256,7 +256,7 @@ export class MedicationLogsService {
       throw new ForbiddenException(
         ResponseHelper.error(
           MessageCodes.INSUFFICIENT_PERMISSIONS,
-          'Insufficient permissions',
+          'Bạn không có đủ quyền',
           403,
         ),
       );
@@ -269,7 +269,7 @@ export class MedicationLogsService {
     return ResponseHelper.success(
       null,
       MessageCodes.MEDICATION_LOG_DELETED,
-      'Medication log deleted successfully',
+      'Xóa lịch sử uống thuốc thành công',
     );
   }
 }

@@ -54,8 +54,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
     }
 
     // Otherwise, format it to our standard
-    let message = 'An error occurred';
-    let errorMessage = 'Error';
+    let message = 'Đã xảy ra lỗi';
+    let errorMessage = 'Lỗi';
 
     if (typeof exceptionResponse === 'string') {
       message = exceptionResponse;

@@ -6,7 +6,7 @@ export class AdminLoginDto {
     example: 'admin123',
     description: 'Admin username',
   })
-  @IsString({ message: 'Username is required' })
+  @IsString({ message: 'Vui lòng nhập tên đăng nhập' })
   username: string;
 
   @ApiProperty({
@@ -14,6 +14,6 @@ export class AdminLoginDto {
     description: 'Admin password',
   })
   @IsString()
-  @MinLength(6, { message: 'Password must be at least 6 characters' })
+  @MinLength(6, { message: 'Mật khẩu phải có ít nhất 6 ký tự' })
   password: string;
 }

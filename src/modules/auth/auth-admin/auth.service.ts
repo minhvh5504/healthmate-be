@@ -94,9 +94,9 @@ export class AuthAdminService {
     if (existingUser) {
       throw new ApiException(
         MessageCodes.USER_ALREADY_EXISTS,
-        'Username already registered',
+        'Tên đăng nhập đã được đăng ký',
         409,
-        'Register failed',
+        'Đăng ký thất bại',
       );
     }
 
@@ -133,7 +133,7 @@ export class AuthAdminService {
         ...tokens,
       },
       MessageCodes.REGISTER_SUCCESS,
-      'Admin registered successfully!',
+      'Đăng ký quản trị viên thành công!',
       201,
     );
   }
@@ -153,9 +153,9 @@ export class AuthAdminService {
     if (!user) {
       throw new ApiException(
         MessageCodes.INVALID_CREDENTIALS,
-        'Username or password is incorrect',
+        'Tên đăng nhập hoặc mật khẩu không chính xác',
         401,
-        'Login failed',
+        'Đăng nhập thất bại',
       );
     }
 
@@ -163,9 +163,9 @@ export class AuthAdminService {
     if (user.role !== Role.admin) {
       throw new ApiException(
         MessageCodes.INSUFFICIENT_PERMISSIONS,
-        'You do not have permission to access the admin portal',
+        'Bạn không có quyền truy cập trang quản trị',
         403,
-        'Login failed',
+        'Đăng nhập thất bại',
       );
     }
 
@@ -175,9 +175,9 @@ export class AuthAdminService {
     if (!isPasswordValid) {
       throw new ApiException(
         MessageCodes.INVALID_CREDENTIALS,
-        'Username or password is incorrect',
+        'Tên đăng nhập hoặc mật khẩu không chính xác',
         401,
-        'Login failed',
+        'Đăng nhập thất bại',
       );
     }
 
@@ -194,7 +194,7 @@ export class AuthAdminService {
         ...tokens,
       },
       MessageCodes.LOGIN_SUCCESS,
-      'Admin login successfully!',
+      'Đăng nhập quản trị viên thành công!',
       200,
     );
   }
@@ -220,9 +220,9 @@ export class AuthAdminService {
       if (!storedToken || storedToken.isRevoked) {
         throw new ApiException(
           MessageCodes.INVALID_REFRESH_TOKEN,
-          'Invalid refresh token',
+          'Refresh token không hợp lệ',
           401,
-          'Token refresh failed',
+          'Làm mới token thất bại',
         );
       }
 
@@ -230,9 +230,9 @@ export class AuthAdminService {
       if (storedToken.user.role !== Role.admin) {
         throw new ApiException(
           MessageCodes.INSUFFICIENT_PERMISSIONS,
-          'Invalid permissions',
+          'Quyền truy cập không hợp lệ',
           403,
-          'Token refresh failed',
+          'Làm mới token thất bại',
         );
       }
 
@@ -240,9 +240,9 @@ export class AuthAdminService {
       if (!storedToken.user.isActive) {
         throw new ApiException(
           MessageCodes.ACCOUNT_DISABLED,
-          'Your account has been deactivated/blocked by admin',
+          'Tài khoản của bạn đã bị quản trị viên vô hiệu hóa hoặc khóa',
           401,
-          'Token refresh failed',
+          'Làm mới token thất bại',
         );
       }
 
@@ -250,9 +250,9 @@ export class AuthAdminService {
       if (new Date() > storedToken.expiresAt) {
         throw new ApiException(
           MessageCodes.REFRESH_TOKEN_EXPIRED,
-          'Refresh token has expired',
+          'Refresh token đã hết hạn',
           401,
-          'Token refresh failed',
+          'Làm mới token thất bại',
         );
       }
 
@@ -273,15 +273,15 @@ export class AuthAdminService {
       return ResponseHelper.success(
         tokens,
         MessageCodes.REFRESH_SUCCESS,
-        'Token refreshed successfully',
+        'Làm mới token thành công',
         200,
       );
     } catch {
       throw new ApiException(
         MessageCodes.INVALID_REFRESH_TOKEN,
-        'Invalid or expired refresh token',
+        'Refresh token không hợp lệ hoặc đã hết hạn',
         401,
-        'Token refresh failed',
+        'Làm mới token thất bại',
       );
     }
   }
@@ -298,7 +298,7 @@ export class AuthAdminService {
     return ResponseHelper.success(
       null,
       MessageCodes.LOGOUT_SUCCESS,
-      'Logged out successfully',
+      'Đăng xuất thành công',
       200,
     );
   }
@@ -313,7 +313,7 @@ export class AuthAdminService {
     });
 
     if (!user || user.role !== Role.admin || !user.isActive) {
-      throw new UnauthorizedException('Unauthorized access to admin resource');
+      throw new UnauthorizedException('Không có quyền truy cập tài nguyên quản trị');
     }
 
     return user;

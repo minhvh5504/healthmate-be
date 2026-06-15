@@ -6,9 +6,9 @@ export class AdminRegisterDto {
     example: 'admin123',
     description: 'Username of the admin',
   })
-  @IsString({ message: 'Username must be a string' })
-  @MinLength(3, { message: 'Username must be at least 3 characters long' })
-  @MaxLength(50, { message: 'Username is too long' })
+  @IsString({ message: 'Tên đăng nhập phải là chuỗi' })
+  @MinLength(3, { message: 'Tên đăng nhập phải có ít nhất 3 ký tự' })
+  @MaxLength(50, { message: 'Tên đăng nhập quá dài' })
   username: string;
 
   @ApiProperty({
@@ -17,7 +17,7 @@ export class AdminRegisterDto {
     minLength: 6,
   })
   @IsString()
-  @MinLength(6, { message: 'Password must be at least 6 characters long' })
-  @MaxLength(50, { message: 'Password is too long' })
+  @MinLength(6, { message: 'Mật khẩu phải có ít nhất 6 ký tự' })
+  @MaxLength(50, { message: 'Mật khẩu quá dài' })
   password: string;
 }

@@ -48,7 +48,7 @@ export class NotificationSchedulerService {
           where: { id: notification.id },
           data: {
             deliveryStatus: 'failed',
-            failureReason: error instanceof Error ? error.message : 'Unknown error',
+            failureReason: error instanceof Error ? error.message : 'Lỗi không xác định',
           },
         });
       }

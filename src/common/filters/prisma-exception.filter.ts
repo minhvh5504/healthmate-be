@@ -11,26 +11,26 @@ export class PrismaExceptionFilter extends BaseExceptionFilter {
     const request = ctx.getRequest<Request>();
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
-    let message = 'Internal server error';
+    let message = 'Lỗi máy chủ nội bộ';
 
     switch (exception.code) {
       case 'P2002':
         // Unique constraint violation
         status = HttpStatus.CONFLICT;
-        message = 'A record with this value already exists';
+        message = 'Bản ghi với giá trị này đã tồn tại';
         break;
       case 'P2025':
-        // Record not found
+        // Không tìm thấy bản ghi
         status = HttpStatus.NOT_FOUND;
-        message = 'Record not found';
+        message = 'Không tìm thấy bản ghi';
         break;
       case 'P2003':
-        // Foreign key constraint failed
+        // Ràng buộc khóa ngoại không hợp lệ
         status = HttpStatus.BAD_REQUEST;
-        message = 'Foreign key constraint failed';
+        message = 'Ràng buộc khóa ngoại không hợp lệ';
         break;
       default:
-        // Unknown Prisma error
+        // Lỗi Prisma không xác định
         status = HttpStatus.INTERNAL_SERVER_ERROR;
         message = exception.message;
     }

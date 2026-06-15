@@ -34,7 +34,7 @@ export class UserRelationshipsService {
 
     if (!relatedUser) {
       throw new NotFoundException(
-        ResponseHelper.error(MessageCodes.USER_NOT_FOUND, 'User to invite not found', 404),
+        ResponseHelper.error(MessageCodes.USER_NOT_FOUND, 'Không tìm thấy người dùng cần mời', 404),
       );
     }
 
@@ -46,13 +46,13 @@ export class UserRelationshipsService {
 
     if (!currentUser) {
       throw new NotFoundException(
-        ResponseHelper.error(MessageCodes.USER_NOT_FOUND, 'Current user not found', 404),
+        ResponseHelper.error(MessageCodes.USER_NOT_FOUND, 'Không tìm thấy người dùng hiện tại', 404),
       );
     }
 
     if (relatedUser.id === userId) {
       throw new BadRequestException(
-        ResponseHelper.error('RELATIONSHIP.SELF_INVITE', 'You cannot invite yourself', 400),
+        ResponseHelper.error('RELATIONSHIP.SELF_INVITE', 'Bạn không thể tự gửi lời mời cho chính mình', 400),
       );
     }
 
@@ -83,14 +83,14 @@ export class UserRelationshipsService {
         return ResponseHelper.success(
           updated,
           MessageCodes.RELATIONSHIP_INVITED,
-          'Invitation sent',
+          'Đã gửi lời mời',
         );
       }
 
       throw new ConflictException(
         ResponseHelper.error(
           MessageCodes.RELATIONSHIP_ALREADY_EXISTS,
-          'A relationship already exists between these users',
+          'Mối liên kết giữa hai người dùng này đã tồn tại',
           409,
         ),
       );
@@ -109,8 +109,8 @@ export class UserRelationshipsService {
     await this.notificationsService.createNotification({
       userId: relatedUser.id,
       type: 'RELATIONSHIP_INVITE',
-      title: 'New Connection Request',
-      body: `${currentUser.profile?.fullName || currentUser.email} wants to connect with you.`,
+      title: 'Lời mời kết nối mới',
+      body: `${currentUser.profile?.fullName || currentUser.email} muốn kết nối với bạn.`,
       iconType: 'user_plus',
     });
 
@@ -123,7 +123,7 @@ export class UserRelationshipsService {
     // 6. Send invitation email with Deep Link + Token
     void this.mailService.sendConnectionInvitation({
       toEmail: relatedUser.email,
-      inviterName: currentUser.profile?.fullName || 'Healthmate User',
+      inviterName: currentUser.profile?.fullName || 'Người dùng Healthmate',
       inviterEmail: currentUser.email,
       relationshipId: relationship.id,
       token: invitationToken,
@@ -135,7 +135,7 @@ export class UserRelationshipsService {
         invitationLink: `${this.configService.get('DEEP_LINK_URL')}?token=${invitationToken}`,
       },
       MessageCodes.RELATIONSHIP_INVITED,
-      'Invitation sent successfully',
+      'Đã gửi lời mời thành công',
     );
   }
 
@@ -146,7 +146,7 @@ export class UserRelationshipsService {
 
     if (!relationship) {
       throw new NotFoundException(
-        ResponseHelper.error(MessageCodes.RELATIONSHIP_NOT_FOUND, 'Relationship not found', 404),
+        ResponseHelper.error(MessageCodes.RELATIONSHIP_NOT_FOUND, 'Không tìm thấy mối liên kết', 404),
       );
     }
 
@@ -154,7 +154,7 @@ export class UserRelationshipsService {
       throw new BadRequestException(
         ResponseHelper.error(
           MessageCodes.INSUFFICIENT_PERMISSIONS,
-          'You can only accept invitations sent to you',
+          'Bạn chỉ có thể chấp nhận lời mời được gửi cho bạn',
           403,
         ),
       );
@@ -164,7 +164,7 @@ export class UserRelationshipsService {
       throw new BadRequestException(
         ResponseHelper.error(
           MessageCodes.RELATIONSHIP_NOT_PENDING,
-          'Relationship is not pending',
+          'Lời mời kết nối không còn ở trạng thái chờ',
           400,
         ),
       );
@@ -182,15 +182,15 @@ export class UserRelationshipsService {
     await this.notificationsService.createNotification({
       userId: relationship.userId,
       type: 'RELATIONSHIP_ACCEPTED',
-      title: 'Connection Request Accepted',
-      body: `Your connection request has been accepted.`,
+      title: 'Lời mời kết nối đã được chấp nhận',
+      body: `Lời mời kết nối của bạn đã được chấp nhận.`,
       iconType: 'user_check',
     });
 
     return ResponseHelper.success(
       updated,
       MessageCodes.RELATIONSHIP_ACCEPTED,
-      'Invitation accepted successfully',
+      'Đã chấp nhận lời mời thành công',
     );
   }
 
@@ -201,7 +201,7 @@ export class UserRelationshipsService {
 
     if (!relationship) {
       throw new NotFoundException(
-        ResponseHelper.error(MessageCodes.RELATIONSHIP_NOT_FOUND, 'Relationship not found', 404),
+        ResponseHelper.error(MessageCodes.RELATIONSHIP_NOT_FOUND, 'Không tìm thấy mối liên kết', 404),
       );
     }
 
@@ -209,7 +209,7 @@ export class UserRelationshipsService {
       throw new BadRequestException(
         ResponseHelper.error(
           MessageCodes.INSUFFICIENT_PERMISSIONS,
-          'You are not part of this relationship',
+          'Bạn không thuộc mối liên kết này',
           403,
         ),
       );
@@ -226,7 +226,7 @@ export class UserRelationshipsService {
     return ResponseHelper.success(
       updated,
       MessageCodes.RELATIONSHIP_REVOKED,
-      'Relationship revoked successfully',
+      'Đã hủy mối liên kết thành công',
     );
   }
 
@@ -287,7 +287,7 @@ export class UserRelationshipsService {
     return ResponseHelper.success(
       formatted,
       MessageCodes.RELATIONSHIP_LIST_RETRIEVED,
-      'Relationships retrieved successfully',
+      'Đã lấy danh sách mối liên kết thành công',
     );
   }
 
@@ -298,7 +298,7 @@ export class UserRelationshipsService {
 
     if (!relationship) {
       throw new NotFoundException(
-        ResponseHelper.error(MessageCodes.RELATIONSHIP_NOT_FOUND, 'Relationship not found', 404),
+        ResponseHelper.error(MessageCodes.RELATIONSHIP_NOT_FOUND, 'Không tìm thấy mối liên kết', 404),
       );
     }
 
@@ -306,7 +306,7 @@ export class UserRelationshipsService {
       throw new BadRequestException(
         ResponseHelper.error(
           MessageCodes.INSUFFICIENT_PERMISSIONS,
-          'You are not part of this relationship',
+          'Bạn không thuộc mối liên kết này',
           403,
         ),
       );
@@ -316,7 +316,7 @@ export class UserRelationshipsService {
       where: { id: relationshipId },
     });
 
-    return ResponseHelper.success(null, MessageCodes.RELATIONSHIP_DELETED, 'Relationship deleted');
+    return ResponseHelper.success(null, MessageCodes.RELATIONSHIP_DELETED, 'Đã xóa mối liên kết');
   }
 
   async acceptByToken(token: string) {
@@ -328,7 +328,7 @@ export class UserRelationshipsService {
 
       if (payload.type !== 'connection_invite' || !payload.relationshipId) {
         throw new BadRequestException(
-          ResponseHelper.error('RELATIONSHIP.INVALID_TOKEN', 'Invalid invitation token', 400),
+          ResponseHelper.error('RELATIONSHIP.INVALID_TOKEN', 'Token lời mời không hợp lệ', 400),
         );
       }
 
@@ -338,7 +338,7 @@ export class UserRelationshipsService {
 
       if (!relationship) {
         throw new NotFoundException(
-          ResponseHelper.error(MessageCodes.RELATIONSHIP_NOT_FOUND, 'Invitation not found', 404),
+          ResponseHelper.error(MessageCodes.RELATIONSHIP_NOT_FOUND, 'Không tìm thấy lời mời', 404),
         );
       }
 
@@ -346,7 +346,7 @@ export class UserRelationshipsService {
         return ResponseHelper.success(
           relationship,
           MessageCodes.RELATIONSHIP_ALREADY_EXISTS,
-          'This invitation has already been processed',
+          'Lời mời này đã được xử lý trước đó',
         );
       }
 
@@ -362,21 +362,21 @@ export class UserRelationshipsService {
       await this.notificationsService.createNotification({
         userId: relationship.userId,
         type: 'RELATIONSHIP_ACCEPTED',
-        title: 'Connection Request Accepted',
-        body: `Your connection request has been accepted via email.`,
+        title: 'Lời mời kết nối đã được chấp nhận',
+        body: `Lời mời kết nối của bạn đã được chấp nhận qua email.`,
         iconType: 'user_check',
       });
 
       return ResponseHelper.success(
         updated,
         MessageCodes.RELATIONSHIP_ACCEPTED,
-        'Invitation accepted successfully',
+        'Đã chấp nhận lời mời thành công',
       );
     } catch (e) {
       const error = e as { name?: string };
       if (error?.name === 'TokenExpiredError') {
         throw new BadRequestException(
-          ResponseHelper.error('RELATIONSHIP.TOKEN_EXPIRED', 'Invitation link has expired', 400),
+          ResponseHelper.error('RELATIONSHIP.TOKEN_EXPIRED', 'Đường dẫn lời mời đã hết hạn', 400),
         );
       }
       throw e;

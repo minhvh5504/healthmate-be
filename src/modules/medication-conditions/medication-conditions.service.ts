@@ -18,7 +18,7 @@ export class MedicationConditionsService {
       throw new ConflictException(
         ResponseHelper.error(
           MessageCodes.MEDICATION_CONDITION_SLUG_EXISTS,
-          'Slug already exists',
+          'Slug đã tồn tại',
           409,
         ),
       );
@@ -31,7 +31,7 @@ export class MedicationConditionsService {
     return ResponseHelper.success(
       condition,
       MessageCodes.MEDICATION_CONDITION_CREATED,
-      'Medication condition created successfully',
+      'Tạo tình trạng dùng thuốc thành công',
     );
   }
 
@@ -43,7 +43,7 @@ export class MedicationConditionsService {
     return ResponseHelper.success(
       conditions,
       MessageCodes.MEDICATION_CONDITION_LIST_RETRIEVED,
-      'Medication conditions retrieved successfully',
+      'Lấy danh sách tình trạng dùng thuốc thành công',
     );
   }
 
@@ -56,7 +56,7 @@ export class MedicationConditionsService {
     return ResponseHelper.success(
       conditions,
       MessageCodes.MEDICATION_CONDITION_LIST_RETRIEVED,
-      'Active medication conditions retrieved successfully',
+      'Lấy danh sách tình trạng dùng thuốc đang hoạt động thành công',
     );
   }
 
@@ -69,7 +69,7 @@ export class MedicationConditionsService {
       throw new NotFoundException(
         ResponseHelper.error(
           MessageCodes.MEDICATION_CONDITION_NOT_FOUND,
-          'Medication condition not found',
+          'Không tìm thấy tình trạng dùng thuốc',
           404,
         ),
       );
@@ -78,7 +78,7 @@ export class MedicationConditionsService {
     return ResponseHelper.success(
       condition,
       MessageCodes.MEDICATION_CONDITION_RETRIEVED,
-      'Medication condition retrieved successfully',
+      'Lấy tình trạng dùng thuốc thành công',
     );
   }
 
@@ -91,7 +91,7 @@ export class MedicationConditionsService {
       throw new NotFoundException(
         ResponseHelper.error(
           MessageCodes.MEDICATION_CONDITION_NOT_FOUND,
-          'Medication condition not found',
+          'Không tìm thấy tình trạng dùng thuốc',
           404,
         ),
       );
@@ -105,7 +105,7 @@ export class MedicationConditionsService {
         throw new ConflictException(
           ResponseHelper.error(
             MessageCodes.MEDICATION_CONDITION_SLUG_EXISTS,
-            'Slug already exists',
+            'Slug đã tồn tại',
             409,
           ),
         );
@@ -120,7 +120,7 @@ export class MedicationConditionsService {
     return ResponseHelper.success(
       updated,
       MessageCodes.MEDICATION_CONDITION_UPDATED,
-      'Medication condition updated successfully',
+      'Cập nhật tình trạng dùng thuốc thành công',
     );
   }
 
@@ -133,7 +133,7 @@ export class MedicationConditionsService {
       throw new NotFoundException(
         ResponseHelper.error(
           MessageCodes.MEDICATION_CONDITION_NOT_FOUND,
-          'Medication condition not found',
+          'Không tìm thấy tình trạng dùng thuốc',
           404,
         ),
       );
@@ -146,7 +146,7 @@ export class MedicationConditionsService {
     return ResponseHelper.success(
       null,
       MessageCodes.MEDICATION_CONDITION_DELETED,
-      'Medication condition deleted successfully',
+      'Xóa tình trạng dùng thuốc thành công',
     );
   }
 }

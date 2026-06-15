@@ -20,7 +20,7 @@ export class NotificationTimeSlotsService {
     return ResponseHelper.success(
       slots,
       MessageCodes.NOTIFICATION_TIME_SLOT_LIST_RETRIEVED,
-      'Notification time slots retrieved successfully',
+      'Lấy danh sách khung giờ thông báo thành công',
     );
   }
 
@@ -34,14 +34,14 @@ export class NotificationTimeSlotsService {
     if (!slot) {
       throw new ApiException(
         MessageCodes.NOTIFICATION_TIME_SLOT_NOT_FOUND,
-        'Notification time slot not found',
+        'Không tìm thấy khung giờ thông báo',
         404,
       );
     }
     return ResponseHelper.success(
       slot,
       MessageCodes.NOTIFICATION_TIME_SLOT_RETRIEVED,
-      'Notification time slot retrieved successfully',
+      'Lấy khung giờ thông báo thành công',
     );
   }
 
@@ -57,7 +57,7 @@ export class NotificationTimeSlotsService {
     return ResponseHelper.success(
       updated,
       MessageCodes.NOTIFICATION_TIME_SLOT_UPDATED,
-      'Notification time slot updated successfully',
+      'Cập nhật khung giờ thông báo thành công',
     );
   }
 
@@ -71,7 +71,7 @@ export class NotificationTimeSlotsService {
     return ResponseHelper.success(
       created,
       MessageCodes.NOTIFICATION_TIME_SLOT_CREATED,
-      'Notification time slot created successfully',
+      'Tạo khung giờ thông báo thành công',
       201,
     );
   }
