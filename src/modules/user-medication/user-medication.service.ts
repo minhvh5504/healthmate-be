@@ -276,7 +276,7 @@ export class UserMedicationService {
 
   async findAllByUser(userId: string) {
     const userMedications = await this.prisma.userMedication.findMany({
-      where: { userId, isActive: true },
+      where: { userId },
       include: {
         medication: true,
         condition: true,
@@ -452,7 +452,8 @@ export class UserMedicationService {
    */
   async update(id: string, userId: string, updateDto: UpdateUserMedicationDto) {
     const { schedules, frequency, selectedDays, ...medicationData } = updateDto;
-    const isAsNeeded = frequency === 'as_needed';
+    const isReactivating = updateDto.isActive === true;
+    const isAsNeeded = isReactivating || frequency === 'as_needed';
 
     // Verify ownership
     const existing = await this.prisma.userMedication.findFirst({
@@ -485,12 +486,50 @@ export class UserMedicationService {
       cleanMedicationData.reminderEnabled = false;
     }
 
+    if (isReactivating) {
+      cleanMedicationData.stockCount = 0;
+      cleanMedicationData.lowStockThreshold = 5;
+      cleanMedicationData.lowStockReminderEnabled = false;
+      cleanMedicationData.startDate = new Date();
+      cleanMedicationData.endDate = null;
+      cleanMedicationData.reminderEnabled = false;
+    }
+
     const updated = await this.prisma.$transaction(async (tx) => {
       // 1. Update basic fields (only fields that were actually provided)
       await tx.userMedication.update({
         where: { id },
         data: cleanMedicationData,
       });
+
+      if (updateDto.isActive === false || isReactivating) {
+        const scheduleIds = existing.reminderSchedules.map(
+          (schedule) => schedule.id,
+        );
+        if (scheduleIds.length > 0) {
+          await tx.notification.updateMany({
+            where: { reminderScheduleId: { in: scheduleIds } },
+            data: { reminderScheduleId: null },
+          });
+          await tx.medicationLog.updateMany({
+            where: { reminderScheduleId: { in: scheduleIds } },
+            data: { reminderScheduleId: null },
+          });
+        }
+
+        await tx.reminderSchedule.deleteMany({
+          where: { userMedicationId: id },
+        });
+
+        return tx.userMedication.findUnique({
+          where: { id },
+          include: {
+            medication: true,
+            condition: true,
+            reminderSchedules: true,
+          },
+        });
+      }
 
       // 2. If schedules provided, update existing rows in place so medication logs
       // keep matching by reminderScheduleId after a time or quantity edit.
@@ -583,7 +622,11 @@ export class UserMedicationService {
       });
     });
 
-    if (updateDto.reminderEnabled === false) {
+    if (
+      updateDto.reminderEnabled === false ||
+      updateDto.isActive === false ||
+      isReactivating
+    ) {
       await this.notificationsService.cancelPendingMedicationRemindersForUserMedication(id);
     }
 
@@ -639,11 +682,29 @@ export class UserMedicationService {
       );
     }
 
-    // Soft delete or hard delete based on preference. Here we do hard delete.
-    // Actually, maybe update isActive = false
-    await this.prisma.userMedication.update({
-      where: { id },
-      data: { isActive: false },
+    const schedules = await this.prisma.reminderSchedule.findMany({
+      where: { userMedicationId: id },
+      select: { id: true },
+    });
+    const scheduleIds = schedules.map((schedule) => schedule.id);
+
+    await this.prisma.$transaction(async (tx) => {
+      if (scheduleIds.length > 0) {
+        await tx.notification.updateMany({
+          where: { reminderScheduleId: { in: scheduleIds } },
+          data: { reminderScheduleId: null },
+        });
+      }
+
+      await tx.medicationLog.deleteMany({
+        where: { userMedicationId: id },
+      });
+      await tx.reminderSchedule.deleteMany({
+        where: { userMedicationId: id },
+      });
+      await tx.userMedication.delete({
+        where: { id },
+      });
     });
 
     return ResponseHelper.success(
