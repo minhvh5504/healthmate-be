@@ -18,7 +18,7 @@ export class CreateNotificationTimeSlotDto {
   @IsNotEmpty()
   @IsString()
   @Matches(/^([01]\d|2[0-3]):?([0-5]\d)$/, {
-    message: 'defaultTime must be in HH:mm format',
+    message: 'defaultTime phải có định dạng HH:mm',
   })
   defaultTime: string;
 }

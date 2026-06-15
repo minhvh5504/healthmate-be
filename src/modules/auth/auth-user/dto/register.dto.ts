@@ -6,7 +6,7 @@ export class RegisterDto {
     example: 'user@example.com',
     description: 'Email address of the user',
   })
-  @IsEmail({}, { message: 'Invalid email address' })
+  @IsEmail({}, { message: 'Email không hợp lệ' })
   email: string;
 
   @ApiProperty({
@@ -15,7 +15,7 @@ export class RegisterDto {
     minLength: 6,
   })
   @IsString()
-  @MinLength(6, { message: 'Password must be at least 6 characters long' })
-  @MaxLength(50, { message: 'Password is too long' })
+  @MinLength(6, { message: 'Mật khẩu phải có ít nhất 6 ký tự' })
+  @MaxLength(50, { message: 'Mật khẩu quá dài' })
   password: string;
 }

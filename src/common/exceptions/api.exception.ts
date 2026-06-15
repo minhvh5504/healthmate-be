@@ -6,7 +6,7 @@ export class ApiException extends HttpException {
     errorCode: string,
     errorMessage: string,
     statusCode: HttpStatus = HttpStatus.BAD_REQUEST,
-    message: string = 'Operation failed',
+    message: string = 'Thao tác thất bại',
   ) {
     const response: ApiResponse = {
       success: false,

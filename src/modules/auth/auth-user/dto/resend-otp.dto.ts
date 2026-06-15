@@ -6,7 +6,7 @@ export class ResendOtpDto {
     example: 'user@example.com',
     description: 'Email address to resend OTP',
   })
-  @IsEmail({}, { message: 'Invalid email address' })
+  @IsEmail({}, { message: 'Email không hợp lệ' })
   email: string;
 
   @ApiProperty({
@@ -14,6 +14,6 @@ export class ResendOtpDto {
     description: 'Type of verification (account or forgotpassword)',
     enum: ['account', 'forgotpassword'],
   })
-  @IsString({ message: 'Type must be account or forgotpassword' })
+  @IsString({ message: 'Type phải là account hoặc forgotpassword' })
   type: 'account' | 'forgotpassword';
 }

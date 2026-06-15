@@ -30,7 +30,7 @@ export class UserMedicationService {
 
     if (!medication) {
       throw new NotFoundException(
-        ResponseHelper.error(MessageCodes.MEDICATION_NOT_FOUND, 'Medication not found', 404),
+        ResponseHelper.error(MessageCodes.MEDICATION_NOT_FOUND, 'Không tìm thấy thuốc', 404),
       );
     }
 
@@ -40,7 +40,7 @@ export class UserMedicationService {
       });
       if (!condition) {
         throw new NotFoundException(
-          ResponseHelper.error('CONDITION_NOT_FOUND', 'Condition not found', 404),
+          ResponseHelper.error('CONDITION_NOT_FOUND', 'Không tìm thấy tình trạng dùng thuốc', 404),
         );
       }
     }
@@ -94,7 +94,7 @@ export class UserMedicationService {
     return ResponseHelper.success(
       userMedication,
       MessageCodes.MEDICATION_CREATED,
-      'User medication created successfully',
+      'Tạo thuốc của người dùng thành công',
     );
   }
 
@@ -213,13 +213,13 @@ export class UserMedicationService {
       scanTask,
       matchedMedicationId ? 'MEDICATION.SCAN.SUCCESS' : 'MEDICATION.SCAN.FAILED',
       matchedMedicationId
-        ? 'Medication matched successfully'
-        : 'No matching medication found. OCR scan saved for manual review',
+        ? 'Nhận diện thuốc thành công'
+        : 'Không tìm thấy thuốc phù hợp. Kết quả OCR đã được lưu để xem lại thủ công',
     );
   }
 
   private buildDraftMedicationName(scannedText: string) {
-    const fallbackName = 'Unrecognized medication scan';
+    const fallbackName = 'Không nhận diện được thuốc từ ảnh quét';
     const name = scannedText || fallbackName;
 
     return name.slice(0, 255);
@@ -252,7 +252,7 @@ export class UserMedicationService {
     return ResponseHelper.success(
       tasks,
       'SCAN_TASKS_RETRIEVED',
-      'Scan tasks retrieved successfully',
+      'Lấy danh sách tác vụ quét thành công',
     );
   }
 
@@ -263,13 +263,13 @@ export class UserMedicationService {
 
     if (!task) {
       throw new NotFoundException(
-        ResponseHelper.error('SCAN_TASK_NOT_FOUND', 'Scan task not found', 404),
+        ResponseHelper.error('SCAN_TASK_NOT_FOUND', 'Không tìm thấy tác vụ quét', 404),
       );
     }
 
     await this.prisma.medicationScanTask.delete({ where: { id } });
 
-    return ResponseHelper.success(null, 'SCAN_TASK_DELETED', 'Scan task deleted successfully');
+    return ResponseHelper.success(null, 'SCAN_TASK_DELETED', 'Xóa tác vụ quét thành công');
   }
 
   async findAllByUser(userId: string) {
@@ -297,7 +297,7 @@ export class UserMedicationService {
     return ResponseHelper.success(
       formatted,
       MessageCodes.MEDICATION_LIST_RETRIEVED,
-      'User medications retrieved successfully',
+      'Lấy danh sách thuốc của người dùng thành công',
     );
   }
   /**
@@ -307,7 +307,7 @@ export class UserMedicationService {
     const targetDate = new Date(dateStr);
 
     if (isNaN(targetDate.getTime())) {
-      return ResponseHelper.error('INVALID_DATE', 'Invalid date format', 400);
+      return ResponseHelper.error('INVALID_DATE', 'Định dạng ngày không hợp lệ', 400);
     }
 
     const startOfDay = new Date(targetDate);
@@ -409,7 +409,7 @@ export class UserMedicationService {
     return ResponseHelper.success(
       { morning, afternoon, evening },
       'DAILY_SCHEDULE_RETRIEVED',
-      'Daily schedule retrieved successfully',
+      'Lấy lịch uống thuốc hằng ngày thành công',
     );
   }
   /**
@@ -427,7 +427,7 @@ export class UserMedicationService {
 
     if (!userMedication) {
       throw new NotFoundException(
-        ResponseHelper.error(MessageCodes.MEDICATION_NOT_FOUND, 'User medication not found', 404),
+        ResponseHelper.error(MessageCodes.MEDICATION_NOT_FOUND, 'Không tìm thấy thuốc của người dùng', 404),
       );
     }
 
@@ -443,7 +443,7 @@ export class UserMedicationService {
     return ResponseHelper.success(
       formatted,
       MessageCodes.MEDICATION_RETRIEVED,
-      'User medication retrieved successfully',
+      'Lấy thông tin thuốc của người dùng thành công',
     );
   }
   /**
@@ -460,7 +460,7 @@ export class UserMedicationService {
 
     if (!existing) {
       throw new NotFoundException(
-        ResponseHelper.error(MessageCodes.MEDICATION_NOT_FOUND, 'User medication not found', 404),
+        ResponseHelper.error(MessageCodes.MEDICATION_NOT_FOUND, 'Không tìm thấy thuốc của người dùng', 404),
       );
     }
 
@@ -470,7 +470,7 @@ export class UserMedicationService {
       });
       if (!condition) {
         throw new NotFoundException(
-          ResponseHelper.error('CONDITION_NOT_FOUND', 'Condition not found', 404),
+          ResponseHelper.error('CONDITION_NOT_FOUND', 'Không tìm thấy tình trạng dùng thuốc', 404),
         );
       }
     }
@@ -564,7 +564,7 @@ export class UserMedicationService {
     return ResponseHelper.success(
       updated,
       MessageCodes.MEDICATION_UPDATED,
-      'User medication updated successfully',
+      'Cập nhật thuốc của người dùng thành công',
     );
   }
   /**
@@ -607,7 +607,7 @@ export class UserMedicationService {
 
     if (!existing) {
       throw new NotFoundException(
-        ResponseHelper.error(MessageCodes.MEDICATION_NOT_FOUND, 'User medication not found', 404),
+        ResponseHelper.error(MessageCodes.MEDICATION_NOT_FOUND, 'Không tìm thấy thuốc của người dùng', 404),
       );
     }
 
@@ -621,7 +621,7 @@ export class UserMedicationService {
     return ResponseHelper.success(
       null,
       MessageCodes.MEDICATION_DELETED,
-      'User medication deleted successfully',
+      'Xóa thuốc của người dùng thành công',
     );
   }
 

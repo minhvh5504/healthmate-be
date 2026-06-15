@@ -8,7 +8,7 @@ export class VerifyPhoneDto {
   })
   @IsString()
   @Matches(/^0[0-9]{9,10}$/, {
-    message: 'Phone number must be 10-11 digits and start with 0',
+    message: 'Số điện thoại phải có 10-11 chữ số và bắt đầu bằng 0',
   })
   phone: string;
 
@@ -17,7 +17,7 @@ export class VerifyPhoneDto {
     description: '6-digit OTP code',
   })
   @IsString()
-  @Length(6, 6, { message: 'OTP must be exactly 6 digits' })
-  @Matches(/^[0-9]{6}$/, { message: 'OTP must contain only digits' })
+  @Length(6, 6, { message: 'OTP phải gồm đúng 6 chữ số' })
+  @Matches(/^[0-9]{6}$/, { message: 'OTP chỉ được chứa chữ số' })
   otp: string;
 }

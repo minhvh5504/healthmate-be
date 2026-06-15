@@ -22,7 +22,7 @@ export class MedicationService {
     return ResponseHelper.success(
       medication,
       MessageCodes.MEDICATION_CREATED,
-      'Medication created successfully',
+      'Tạo thuốc thành công',
       201,
     );
   }
@@ -37,7 +37,7 @@ export class MedicationService {
     return ResponseHelper.success(
       medications,
       MessageCodes.MEDICATION_LIST_RETRIEVED,
-      'All medications retrieved successfully',
+      'Lấy danh sách thuốc thành công',
     );
   }
 
@@ -73,7 +73,7 @@ export class MedicationService {
         limit,
       },
       MessageCodes.MEDICATION_LIST_RETRIEVED,
-      'Admin medications retrieved successfully',
+      'Lấy danh sách thuốc quản trị thành công',
     );
   }
 
@@ -82,7 +82,7 @@ export class MedicationService {
    */
   async search(query: string) {
     if (!query) {
-      return ResponseHelper.success([], MessageCodes.MEDICATION_SEARCH_SUCCESS, 'Search results');
+      return ResponseHelper.success([], MessageCodes.MEDICATION_SEARCH_SUCCESS, 'Kết quả tìm kiếm');
     }
 
     const medications = await this.prisma.medication.findMany({
@@ -98,7 +98,7 @@ export class MedicationService {
     return ResponseHelper.success(
       medications,
       MessageCodes.MEDICATION_SEARCH_SUCCESS,
-      'Search results',
+      'Kết quả tìm kiếm',
     );
   }
 
@@ -111,13 +111,13 @@ export class MedicationService {
     });
 
     if (!medication) {
-      throw new NotFoundException('Medication not found');
+      throw new NotFoundException('Không tìm thấy thuốc');
     }
 
     return ResponseHelper.success(
       medication,
       MessageCodes.MEDICATION_RETRIEVED,
-      'Medication retrieved successfully',
+      'Lấy thông tin thuốc thành công',
     );
   }
 
@@ -135,7 +135,7 @@ export class MedicationService {
     return ResponseHelper.success(
       updatedMedication,
       MessageCodes.MEDICATION_UPDATED,
-      'Medication updated successfully',
+      'Cập nhật thuốc thành công',
     );
   }
 
@@ -152,7 +152,7 @@ export class MedicationService {
     return ResponseHelper.success(
       null,
       MessageCodes.MEDICATION_DELETED,
-      'Medication deleted successfully',
+      'Xóa thuốc thành công',
     );
   }
 }

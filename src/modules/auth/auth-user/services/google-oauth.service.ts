@@ -51,12 +51,12 @@ export class GoogleOAuthService implements OnModuleInit {
       };
     } catch (error) {
       if (error instanceof ApiException) throw error;
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : 'Lỗi không xác định';
       throw new ApiException(
         'AUTH.GOOGLE.VERIFICATION_FAILED',
-        `Unable to verify Firebase ID token: ${errorMessage}`,
+        `Không thể xác minh Firebase ID token: ${errorMessage}`,
         401,
-        'Google authentication failed',
+        'Xác thực Google thất bại',
       );
     }
   }

@@ -42,7 +42,7 @@ export class StatisticsService {
         },
       },
       MessageCodes.STATISTICS_RETRIEVED,
-      'Dashboard statistics retrieved successfully',
+      'Lấy thống kê tổng quan thành công',
     );
   }
 
@@ -105,7 +105,7 @@ export class StatisticsService {
     return ResponseHelper.success(
       chartData,
       MessageCodes.STATISTICS_RETRIEVED,
-      'Chart data retrieved successfully',
+      'Lấy dữ liệu biểu đồ thành công',
     );
   }
 
@@ -134,7 +134,7 @@ export class StatisticsService {
     return ResponseHelper.success(
       result,
       MessageCodes.STATISTICS_RETRIEVED,
-      'Recent users retrieved successfully',
+      'Lấy danh sách người dùng gần đây thành công',
     );
   }
 }

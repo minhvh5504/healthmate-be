@@ -6,8 +6,8 @@ export class ChangePasswordDto {
     example: 'OldPassword123@',
     description: 'Current password of the user',
   })
-  @IsString({ message: 'Current password must be a string' })
-  @IsNotEmpty({ message: 'Current password is required' })
+  @IsString({ message: 'Mật khẩu hiện tại phải là chuỗi' })
+  @IsNotEmpty({ message: 'Vui lòng nhập mật khẩu hiện tại' })
   currentPassword: string;
 
   @ApiProperty({
@@ -15,7 +15,7 @@ export class ChangePasswordDto {
     description: 'New password (min 6, max 50 characters)',
   })
   @IsString()
-  @IsNotEmpty({ message: 'New password is required' })
-  @Length(6, 50, { message: 'New password must be between 6 and 50 characters' })
+  @IsNotEmpty({ message: 'Vui lòng nhập mật khẩu mới' })
+  @Length(6, 50, { message: 'Mật khẩu mới phải dài từ 6 đến 50 ký tự' })
   newPassword: string;
 }

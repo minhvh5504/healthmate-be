@@ -29,7 +29,7 @@ export class JwtAdminStrategy extends PassportStrategy(Strategy, 'jwt-admin') {
     const admin = await this.authAdminService.validateAdmin(payload.sub);
 
     if (!admin) {
-      throw new UnauthorizedException('Invalid token or insufficient permissions');
+      throw new UnauthorizedException('Token không hợp lệ hoặc không đủ quyền');
     }
 
     return admin;

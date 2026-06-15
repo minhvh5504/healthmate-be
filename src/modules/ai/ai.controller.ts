@@ -86,7 +86,7 @@ export class AiController {
         res.write(`data: ${JSON.stringify(data)}\n\n`);
       },
       error: (e: unknown) => {
-        const errMessage = e instanceof Error ? e.message : 'Unknown error';
+        const errMessage = e instanceof Error ? e.message : 'Lỗi không xác định';
         res.write(`data: ${JSON.stringify({ error: errMessage })}\n\n`);
         res.end();
       },

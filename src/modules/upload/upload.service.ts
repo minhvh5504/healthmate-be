@@ -36,9 +36,9 @@ export class UploadService {
     if (!file) {
       throw new ApiException(
         MessageCodes.FILE_UPLOAD_FAILED,
-        'No file provided',
+        'Chưa cung cấp file',
         400,
-        'File upload failed',
+        'Tải file lên thất bại',
       );
     }
 
@@ -48,7 +48,7 @@ export class UploadService {
     return ResponseHelper.success(
       result,
       MessageCodes.FILE_UPLOADED,
-      'Icon uploaded successfully',
+      'Tải biểu tượng lên thành công',
       201,
     );
   }
@@ -78,9 +78,9 @@ export class UploadService {
     if (!file) {
       throw new ApiException(
         MessageCodes.FILE_UPLOAD_FAILED,
-        'No file provided',
+        'Chưa cung cấp file',
         400,
-        'File upload failed',
+        'Tải file lên thất bại',
       );
     }
 
@@ -96,7 +96,7 @@ export class UploadService {
     return ResponseHelper.success(
       result,
       MessageCodes.FILE_UPLOADED,
-      'Avatar uploaded successfully',
+      'Tải ảnh đại diện lên thành công',
       201,
     );
   }
@@ -107,9 +107,9 @@ export class UploadService {
     if (!file) {
       throw new ApiException(
         MessageCodes.FILE_UPLOAD_FAILED,
-        'No file provided',
+        'Chưa cung cấp file',
         400,
-        'File upload failed',
+        'Tải file lên thất bại',
       );
     }
 
@@ -148,12 +148,12 @@ export class UploadService {
         },
         (error, result) => {
           if (error) {
-            reject(toError(error, 'Cloudinary upload failed'));
+            reject(toError(error, 'Tải ảnh lên Cloudinary thất bại'));
             return;
           }
 
           if (!result) {
-            reject(new Error('Cloudinary upload failed: empty result'));
+            reject(new Error('Tải ảnh lên Cloudinary thất bại: không có kết quả'));
             return;
           }
 
@@ -172,9 +172,9 @@ export class UploadService {
     if (!file) {
       throw new ApiException(
         MessageCodes.FILE_UPLOAD_FAILED,
-        'No file provided',
+        'Chưa cung cấp file',
         400,
-        'File validation failed',
+        'Kiểm tra file thất bại',
       );
     }
 
@@ -182,9 +182,9 @@ export class UploadService {
     if (file.size > this.maxFileSize) {
       throw new ApiException(
         MessageCodes.FILE_TOO_LARGE,
-        'File size exceeds 5MB limit',
+        'Kích thước file vượt quá giới hạn 5MB',
         400,
-        'File validation failed',
+        'Kiểm tra file thất bại',
       );
     }
 
@@ -193,9 +193,9 @@ export class UploadService {
     if (!this.allowedExtensions.includes(ext)) {
       throw new ApiException(
         MessageCodes.FILE_INVALID_TYPE,
-        `Invalid file type. Allowed types: ${this.allowedExtensions.join(', ')}`,
+        `Loại file không hợp lệ. Các loại được phép: ${this.allowedExtensions.join(', ')}`,
         400,
-        'File validation failed',
+        'Kiểm tra file thất bại',
       );
     }
 
@@ -204,9 +204,9 @@ export class UploadService {
     if (!validMimeTypes.includes(file.mimetype)) {
       throw new ApiException(
         MessageCodes.FILE_INVALID_TYPE,
-        'Invalid file MIME type',
+        'MIME type của file không hợp lệ',
         400,
-        'File validation failed',
+        'Kiểm tra file thất bại',
       );
     }
   }

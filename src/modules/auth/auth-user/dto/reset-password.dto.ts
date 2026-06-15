@@ -6,8 +6,8 @@ export class ResetPasswordDto {
     example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
     description: 'Temporary reset token received after verifying OTP',
   })
-  @IsString({ message: 'Reset token must be a string' })
-  @IsNotEmpty({ message: 'Reset token is required' })
+  @IsString({ message: 'Reset token phải là chuỗi' })
+  @IsNotEmpty({ message: 'Vui lòng cung cấp reset token' })
   resetToken: string;
 
   @ApiProperty({
@@ -16,7 +16,7 @@ export class ResetPasswordDto {
     minLength: 6,
   })
   @IsString()
-  @IsNotEmpty({ message: 'New password is required' })
-  @Length(6, 50, { message: 'Password must be between 6 and 50 characters' })
+  @IsNotEmpty({ message: 'Vui lòng nhập mật khẩu mới' })
+  @Length(6, 50, { message: 'Mật khẩu phải dài từ 6 đến 50 ký tự' })
   newPassword: string;
 }
