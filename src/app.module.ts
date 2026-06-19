@@ -23,6 +23,7 @@ import { MedicationLogsModule } from './modules/medication-logs/medication-logs.
 import { FirebaseModule } from './modules/firebase/firebase.module';
 import { StatisticsModule } from './modules/statistics/statistics.module';
 import { AiModule } from './modules/ai/ai.module';
+import { PrescriptionsModule } from './modules/prescriptions/prescriptions.module';
 
 @Module({
   imports: [
@@ -63,6 +64,7 @@ import { AiModule } from './modules/ai/ai.module';
     MedicationLogsModule,
     StatisticsModule,
     AiModule,
+    PrescriptionsModule,
   ],
   providers: [
     // Global guard - apply JWT auth to all routes by default
