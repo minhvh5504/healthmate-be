@@ -24,7 +24,6 @@ model User {
 
   profile           UserProfile?
   refreshTokens     RefreshToken[]
-
   userAllergies      UserAllergy[]
   createdMedications Medication[]
   userMedications    UserMedication[]
@@ -35,6 +34,7 @@ model User {
   scanTasks          MedicationScanTask[]
   healthLogs         UserHealthLog[]
   aiMessages         AiMessage[]
+  prescriptions      Prescription[]
 
   @@index([email])
   @@index([username])
@@ -338,10 +338,36 @@ model AiMessage {
   @@map("ai_messages")
 }
 
+model Prescription {
+  id            String             @id @default(uuid())
+  userId        String             @map("user_id")
+  doctorName    String?            @map("doctor_name") @db.VarChar(255)
+  clinicName    String?            @map("clinic_name") @db.VarChar(255)
+  imageUrl      String             @map("image_url") @db.VarChar(500)
+  imagePublicId String?            @map("image_public_id") @db.VarChar(255)
+  startDate     DateTime           @map("start_date") @db.Date
+  endDate       DateTime?          @map("end_date") @db.Date
+  note          String?            @db.Text
+  status        PrescriptionStatus @default(ACTIVE)
+  createdAt     DateTime           @default(now()) @map("created_at")
+  updatedAt     DateTime           @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([userId, startDate])
+  @@map("prescriptions")
+}
+
 enum ScanStatus {
   PENDING
   SUCCESS
   FAILED
+}
+
+enum PrescriptionStatus {
+  ACTIVE
+  COMPLETED
 }
 
 enum Role {
