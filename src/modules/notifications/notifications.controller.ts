@@ -23,7 +23,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RegisterDeviceTokenDto } from './dto/register-device-token.dto';
 
 @ApiTags('notifications')
-@ApiBearerAuth()
+@ApiBearerAuth('JWT-auth')
 @UseGuards(JwtAuthGuard)
 @Controller('notifications')
 export class NotificationsController {

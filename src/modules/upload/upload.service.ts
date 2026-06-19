@@ -116,6 +116,24 @@ export class UploadService {
     return this.uploadBufferToCloudinary(file, 'healthmate/medication-scans');
   }
 
+  async uploadPrescriptionImage(
+    file: Express.Multer.File | undefined,
+    prescriptionId: string,
+  ): Promise<UploadResult> {
+    this.validateFile(file, 10 * 1024 * 1024);
+
+    if (!file) {
+      throw new ApiException(
+        MessageCodes.FILE_UPLOAD_FAILED,
+        'Chưa cung cấp file',
+        400,
+        'Tải ảnh đơn thuốc thất bại',
+      );
+    }
+
+    return this.uploadBufferToCloudinary(file, `healthmate/prescriptions/${prescriptionId}`);
+  }
+
   async deleteAvatar(publicId: string | null | undefined): Promise<void> {
     if (!publicId) return;
 
@@ -168,7 +186,10 @@ export class UploadService {
     });
   }
 
-  private validateFile(file: Express.Multer.File | undefined): void {
+  private validateFile(
+    file: Express.Multer.File | undefined,
+    maxFileSize = this.maxFileSize,
+  ): void {
     if (!file) {
       throw new ApiException(
         MessageCodes.FILE_UPLOAD_FAILED,
@@ -179,10 +200,10 @@ export class UploadService {
     }
 
     // Check file size
-    if (file.size > this.maxFileSize) {
+    if (file.size > maxFileSize) {
       throw new ApiException(
         MessageCodes.FILE_TOO_LARGE,
-        'Kích thước file vượt quá giới hạn 5MB',
+        `Kích thước file vượt quá giới hạn ${Math.round(maxFileSize / 1024 / 1024)}MB`,
         400,
         'Kiểm tra file thất bại',
       );
