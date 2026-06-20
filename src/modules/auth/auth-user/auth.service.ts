@@ -353,7 +353,7 @@ export class AuthService {
       const remainingMinutes = Math.ceil((user.lockedUntil.getTime() - Date.now()) / (1000 * 60));
       throw new ApiException(
         MessageCodes.ACCOUNT_LOCKED,
-        `Tài khoản của bạn đã bị khóa 30 phút do đăng nhập sai 5 lần. Vui lòng chờ thêm ${remainingMinutes} phút.`,
+        `Tài khoản của bạn đã bị khóa 5 phút do đăng nhập sai 5 lần. Vui lòng chờ thêm ${remainingMinutes} phút.`,
         401,
         'Đăng nhập thất bại',
       );
@@ -386,8 +386,8 @@ export class AuthService {
       const failedAttempts = (user.failedLoginAttempts || 0) + 1;
 
       if (failedAttempts >= 5) {
-        // Set temporary lockout for 30 minutes
-        const lockedUntil = new Date(Date.now() + 30 * 60 * 1000);
+        // Set temporary lockout for 5 minutes
+        const lockedUntil = new Date(Date.now() + 5 * 60 * 1000);
         await this.prisma.user.update({
           where: { id: user.id },
           data: {
@@ -397,7 +397,7 @@ export class AuthService {
         });
         throw new ApiException(
           MessageCodes.ACCOUNT_LOCKED,
-          'Tài khoản của bạn đã bị khóa 30 phút do đăng nhập sai 5 lần.',
+          'Tài khoản của bạn đã bị khóa 5 phút do đăng nhập sai 5 lần.',
           401,
           'Đăng nhập thất bại',
         );
