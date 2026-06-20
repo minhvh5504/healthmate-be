@@ -36,6 +36,13 @@ export class NotificationsController {
     return this.notificationsService.registerDeviceToken(userId, dto);
   }
 
+  @Delete('device-tokens')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Unregister FCM device token on logout' })
+  unregisterDeviceToken(@CurrentUser('id') userId: string, @Query('token') token: string) {
+    return this.notificationsService.unregisterDeviceToken(userId, token);
+  }
+
   @Get()
   @ApiOperation({ summary: 'Get all notifications for current user' })
   findAll(@CurrentUser('id') userId: string, @Query() query: QueryNotificationDto) {

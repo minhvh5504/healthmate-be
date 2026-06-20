@@ -448,6 +448,14 @@ export class NotificationsService {
     });
   }
 
+  async unregisterDeviceToken(userId: string, token: string) {
+    if (!token) return { count: 0 };
+
+    return await this.prisma.deviceToken.deleteMany({
+      where: { userId, token },
+    });
+  }
+
   // ============================================
   // PRIVATE HELPERS
   // ============================================
