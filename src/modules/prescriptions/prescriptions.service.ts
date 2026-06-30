@@ -9,6 +9,8 @@ import { UpdatePrescriptionDto } from './dto/update-prescription.dto';
 
 @Injectable()
 export class PrescriptionsService {
+  private readonly vietnamTimeZone = 'Asia/Ho_Chi_Minh';
+
   constructor(
     private prisma: PrismaService,
     private uploadService: UploadService,
@@ -33,7 +35,7 @@ export class PrescriptionsService {
         startDate: new Date(dto.startDate),
         endDate: dto.endDate ? new Date(dto.endDate) : null,
         note: dto.note,
-        status: dto.status,
+        status: this.resolvePrescriptionStatus(dto.status, dto.endDate),
       },
     });
 
@@ -73,6 +75,8 @@ export class PrescriptionsService {
   }
 
   async findAllByUser(userId: string, status?: PrescriptionStatus) {
+    await this.completeExpiredPrescriptions();
+
     const prescriptions = await this.prisma.prescription.findMany({
       where: {
         userId,
@@ -89,6 +93,8 @@ export class PrescriptionsService {
   }
 
   async findOne(id: string, userId: string) {
+    await this.completeExpiredPrescriptions();
+
     const prescription = await this.findOwnedPrescription(id, userId);
 
     return ResponseHelper.success(
@@ -124,7 +130,7 @@ export class PrescriptionsService {
         startDate: dto.startDate ? new Date(dto.startDate) : undefined,
         endDate: dto.endDate === undefined ? undefined : dto.endDate ? new Date(dto.endDate) : null,
         note: dto.note,
-        status: dto.status,
+        status: this.resolvePrescriptionStatus(dto.status ?? existing.status, endDate),
       },
     });
 
@@ -145,6 +151,22 @@ export class PrescriptionsService {
       MessageCodes.PRESCRIPTION_DELETED,
       'Xóa đơn thuốc thành công',
     );
+  }
+
+  async completeExpiredPrescriptions() {
+    const today = this.getTodayDateInVietnam();
+
+    return this.prisma.prescription.updateMany({
+      where: {
+        status: PrescriptionStatus.ACTIVE,
+        endDate: {
+          lt: today,
+        },
+      },
+      data: {
+        status: PrescriptionStatus.COMPLETED,
+      },
+    });
   }
 
   private async findOwnedPrescription(id: string, userId: string) {
@@ -178,5 +200,52 @@ export class PrescriptionsService {
         ),
       );
     }
+  }
+
+  private resolvePrescriptionStatus(
+    status: PrescriptionStatus | undefined,
+    endDateValue?: string | Date | null,
+  ) {
+    if (!endDateValue) {
+      return status;
+    }
+
+    const endDate = this.toDateOnly(endDateValue);
+    const today = this.getTodayDateInVietnam();
+
+    if (endDate < today) {
+      return PrescriptionStatus.COMPLETED;
+    }
+
+    return status;
+  }
+
+  private getTodayDateInVietnam() {
+    const dateStr = this.formatDateInVietnam(new Date());
+    return new Date(`${dateStr}T00:00:00.000Z`);
+  }
+
+  private toDateOnly(dateValue: string | Date) {
+    const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(date.getUTCDate()).padStart(2, '0');
+
+    return new Date(`${year}-${month}-${day}T00:00:00.000Z`);
+  }
+
+  private formatDateInVietnam(date: Date) {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: this.vietnamTimeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(date);
+
+    const year = parts.find((part) => part.type === 'year')?.value;
+    const month = parts.find((part) => part.type === 'month')?.value;
+    const day = parts.find((part) => part.type === 'day')?.value;
+
+    return `${year}-${month}-${day}`;
   }
 }
