@@ -2,12 +2,13 @@ import { Module } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module';
 import { UploadModule } from '../upload/upload.module';
 import { PrescriptionsController } from './prescriptions.controller';
+import { PrescriptionStatusSchedulerService } from './prescription-status-scheduler.service';
 import { PrescriptionsService } from './prescriptions.service';
 
 @Module({
   imports: [PrismaModule, UploadModule],
   controllers: [PrescriptionsController],
-  providers: [PrescriptionsService],
+  providers: [PrescriptionsService, PrescriptionStatusSchedulerService],
   exports: [PrescriptionsService],
 })
 export class PrescriptionsModule {}
