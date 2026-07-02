@@ -75,7 +75,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
 
       // Push initial unread count upon connection
       const unreadCount = await this.prisma.notification.count({
-        where: { userId, isRead: false },
+        where: { userId, isRead: false, deliveryStatus: 'sent' },
       });
       this.emitUnreadCountToUser(userId, unreadCount);
     } catch (err) {
