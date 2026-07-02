@@ -55,7 +55,7 @@ export class NotificationsService {
     const { isRead, type, search, limit = 20, page = 1 } = query;
     const skip = (page - 1) * limit;
 
-    const where: Prisma.NotificationWhereInput = { userId };
+    const where: Prisma.NotificationWhereInput = { userId, deliveryStatus: 'sent' };
     if (isRead !== undefined) where.isRead = isRead;
     if (type) where.type = type;
     if (search) {
@@ -88,7 +88,7 @@ export class NotificationsService {
 
   async getUnreadCount(userId: string) {
     const count = await this.prisma.notification.count({
-      where: { userId, isRead: false },
+      where: { userId, isRead: false, deliveryStatus: 'sent' },
     });
     return { unreadCount: count };
   }
@@ -130,7 +130,7 @@ export class NotificationsService {
 
     // Update unread badge count via WebSocket
     const unreadCount = await this.prisma.notification.count({
-      where: { userId: targetUserId, isRead: false },
+      where: { userId: targetUserId, isRead: false, deliveryStatus: 'sent' },
     });
     this.realtimeGateway.emitUnreadCountToUser(targetUserId, unreadCount);
 
@@ -153,7 +153,11 @@ export class NotificationsService {
   }
 
   async markReadBulk(userId: string, ids?: string[], all?: boolean) {
-    const where: Prisma.NotificationUpdateManyArgs['where'] = { userId, isRead: false };
+    const where: Prisma.NotificationUpdateManyArgs['where'] = {
+      userId,
+      isRead: false,
+      deliveryStatus: 'sent',
+    };
 
     if (!all && ids && ids.length > 0) {
       where.id = { in: ids };
@@ -290,7 +294,7 @@ export class NotificationsService {
 
     // Luôn cập nhật badge số thông báo chưa đọc
     const unreadCount = await this.prisma.notification.count({
-      where: { userId: payload.userId, isRead: false },
+      where: { userId: payload.userId, isRead: false, deliveryStatus: 'sent' },
     });
     this.realtimeGateway.emitUnreadCountToUser(payload.userId, unreadCount);
 
@@ -578,7 +582,7 @@ export class NotificationsService {
    */
   private async refreshUnreadBadge(userId: string) {
     const unreadCount = await this.prisma.notification.count({
-      where: { userId, isRead: false },
+      where: { userId, isRead: false, deliveryStatus: 'sent' },
     });
     this.realtimeGateway.emitUnreadCountToUser(userId, unreadCount);
   }
