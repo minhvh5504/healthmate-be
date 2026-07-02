@@ -323,7 +323,7 @@ export class NotificationsService {
       reminderScheduleId: payload.reminderScheduleId,
       type: 'medication_reminder',
       title: 'Nhắc uống thuốc',
-      body: `Bạn có lịch uống ${medicationDose} sau 1 giờ.`,
+      body: `Bạn có lịch uống ${medicationDose} sau 15 phút.`,
       scheduledFor: payload.scheduledFor,
       iconType: 'medication',
       fcmData: {
@@ -339,7 +339,7 @@ export class NotificationsService {
           reminderScheduleId: payload.reminderScheduleId,
           type: 'medication_reminder',
           title: 'Nhắc uống thuốc',
-          body: `Vui lòng nhắc ${ownerDisplayName} uống ${medicationDose} sau 1 giờ.`,
+          body: `Vui lòng nhắc ${ownerDisplayName} uống ${medicationDose} sau 15 phút.`,
           scheduledFor: payload.scheduledFor,
           iconType: 'medication',
           fcmData: {

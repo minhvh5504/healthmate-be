@@ -52,17 +52,18 @@ export class UserMedicationService {
           userId,
           ...medicationData,
           ...(isAsNeeded ? { endDate: null, reminderEnabled: false } : {}),
-          reminderSchedules: !isAsNeeded && schedules?.length
-            ? {
-                create: schedules.map((s) => ({
-                  remindTime: s.time,
-                  quantity: s.quantity,
-                  dosage: medicationData.dosage,
-                  repeatType: frequency || 'daily',
-                  repeatDays: selectedDays || [],
-                })),
-              }
-            : undefined,
+          reminderSchedules:
+            !isAsNeeded && schedules?.length
+              ? {
+                  create: schedules.map((s) => ({
+                    remindTime: s.time,
+                    quantity: s.quantity,
+                    dosage: medicationData.dosage,
+                    repeatType: frequency || 'daily',
+                    repeatDays: selectedDays || [],
+                  })),
+                }
+              : undefined,
         },
         include: {
           medication: true,
@@ -75,9 +76,17 @@ export class UserMedicationService {
     if (medicationData.reminderEnabled !== false && userMedication.reminderSchedules?.length) {
       await Promise.all(
         userMedication.reminderSchedules.map((schedule) => {
-          const medicationTime = this.getNextScheduledTime(schedule.remindTime);
+          const medicationTime = this.getNextScheduledTime(
+            schedule.remindTime,
+            userMedication.startDate,
+            userMedication.endDate,
+            schedule.repeatType,
+            schedule.repeatDays,
+          );
 
-          const scheduledFor = new Date(medicationTime.getTime() - 60 * 60 * 1000);
+          if (!medicationTime) return [];
+
+          const scheduledFor = new Date(medicationTime.getTime() - 15 * 60 * 1000);
 
           return this.notificationsService.createMedicationReminderNotifications({
             ownerUserId: userId,
@@ -108,8 +117,7 @@ export class UserMedicationService {
 
     const cleanText = scannedText.trim().replace(/\s+/g, ' ');
 
-    // 1. Try to find existing medications. OCR text from mobile is usually
-    // accent-free, while medication names in DB are Vietnamese with accents.
+    // OCR text from mobile is usually accent-free, while medication names in DB are Vietnamese with accents.
     const normalizedScanText = this.normalizeSearchText(cleanText);
     const keywords = normalizedScanText.split(' ').filter((w) => w.length > 2);
 
@@ -194,8 +202,7 @@ export class UserMedicationService {
         : {}),
     } as Prisma.InputJsonValue;
 
-    // 2. Save the scan result. Failed scans keep OCR text/image only so the
-    // client can let users add the medication manually.
+    // Failed scans keep OCR text/image only so the client can let users add the medication manually.
     const scanTask = await this.prisma.medicationScanTask.create({
       data: {
         userId,
@@ -428,7 +435,11 @@ export class UserMedicationService {
 
     if (!userMedication) {
       throw new NotFoundException(
-        ResponseHelper.error(MessageCodes.MEDICATION_NOT_FOUND, 'Không tìm thấy thuốc của người dùng', 404),
+        ResponseHelper.error(
+          MessageCodes.MEDICATION_NOT_FOUND,
+          'Không tìm thấy thuốc của người dùng',
+          404,
+        ),
       );
     }
 
@@ -463,7 +474,11 @@ export class UserMedicationService {
 
     if (!existing) {
       throw new NotFoundException(
-        ResponseHelper.error(MessageCodes.MEDICATION_NOT_FOUND, 'Không tìm thấy thuốc của người dùng', 404),
+        ResponseHelper.error(
+          MessageCodes.MEDICATION_NOT_FOUND,
+          'Không tìm thấy thuốc của người dùng',
+          404,
+        ),
       );
     }
 
@@ -503,9 +518,7 @@ export class UserMedicationService {
       });
 
       if (updateDto.isActive === false || isReactivating) {
-        const scheduleIds = existing.reminderSchedules.map(
-          (schedule) => schedule.id,
-        );
+        const scheduleIds = existing.reminderSchedules.map((schedule) => schedule.id);
         if (scheduleIds.length > 0) {
           await tx.notification.updateMany({
             where: { reminderScheduleId: { in: scheduleIds } },
@@ -539,9 +552,7 @@ export class UserMedicationService {
           where: { userMedicationId: id },
         });
       } else if (schedules) {
-        const existingSchedulesById = new Map(
-          existing.reminderSchedules.map((s) => [s.id, s]),
-        );
+        const existingSchedulesById = new Map(existing.reminderSchedules.map((s) => [s.id, s]));
         const incomingExistingIds = schedules
           .map((s) => s.id)
           .filter((scheduleId): scheduleId is string => Boolean(scheduleId));
@@ -562,15 +573,22 @@ export class UserMedicationService {
             quantity: schedule.quantity,
             dosage: updateDto.dosage || existing.dosage,
             repeatType:
-              frequency || existingSchedule?.repeatType || firstExistingSchedule?.repeatType || 'daily',
+              frequency ||
+              existingSchedule?.repeatType ||
+              firstExistingSchedule?.repeatType ||
+              'daily',
             repeatDays:
-              selectedDays || existingSchedule?.repeatDays || firstExistingSchedule?.repeatDays || [],
+              selectedDays ||
+              existingSchedule?.repeatDays ||
+              firstExistingSchedule?.repeatDays ||
+              [],
             isActive: updateDto.reminderEnabled ?? existing.reminderEnabled ?? true,
           };
 
           if (existingSchedule) {
             const repeatDaysChanged =
-              JSON.stringify(existingSchedule.repeatDays) !== JSON.stringify(scheduleData.repeatDays);
+              JSON.stringify(existingSchedule.repeatDays) !==
+              JSON.stringify(scheduleData.repeatDays);
             const scheduleChanged =
               existingSchedule.remindTime !== scheduleData.remindTime ||
               existingSchedule.quantity !== scheduleData.quantity ||
@@ -622,11 +640,7 @@ export class UserMedicationService {
       });
     });
 
-    if (
-      updateDto.reminderEnabled === false ||
-      updateDto.isActive === false ||
-      isReactivating
-    ) {
+    if (updateDto.reminderEnabled === false || updateDto.isActive === false || isReactivating) {
       await this.notificationsService.cancelPendingMedicationRemindersForUserMedication(id);
     }
 
@@ -678,7 +692,11 @@ export class UserMedicationService {
 
     if (!existing) {
       throw new NotFoundException(
-        ResponseHelper.error(MessageCodes.MEDICATION_NOT_FOUND, 'Không tìm thấy thuốc của người dùng', 404),
+        ResponseHelper.error(
+          MessageCodes.MEDICATION_NOT_FOUND,
+          'Không tìm thấy thuốc của người dùng',
+          404,
+        ),
       );
     }
 
@@ -715,26 +733,78 @@ export class UserMedicationService {
   }
 
   /**
-   * Calculate the next datetime for a given "HH:mm" reminder time.
-   * If the time hasn't passed today, return today's date; otherwise tomorrow.
+   * Calculate the next medication datetime in Vietnam time for a given "HH:mm" reminder time.
    */
-  private getNextScheduledTime(remindTime: string | null): Date {
+  private getNextScheduledTime(
+    remindTime: string | null,
+    startDate?: Date | null,
+    endDate?: Date | null,
+    repeatType = 'daily',
+    repeatDays: number[] = [],
+  ): Date | null {
     const now = new Date();
 
     if (!remindTime) return now;
 
-    const [hourStr, minuteStr] = remindTime.split(':');
-    const hour = parseInt(hourStr, 10);
-    const minute = parseInt(minuteStr, 10);
+    const today = this.formatDateInVietnam(now);
+    const startDateStr = startDate ? this.formatDateInVietnam(startDate) : today;
+    const firstDateStr = startDateStr > today ? startDateStr : today;
+    const endDateStr = endDate ? this.formatDateInVietnam(endDate) : null;
+    const baseNoon = new Date(`${firstDateStr}T12:00:00.000+07:00`);
 
-    const scheduled = new Date(now);
-    scheduled.setHours(hour, minute, 0, 0);
+    for (let offset = 0; offset < 370; offset += 1) {
+      const date = new Date(baseNoon);
+      date.setUTCDate(date.getUTCDate() + offset);
+      const dateStr = this.formatDateInVietnam(date);
 
-    // If this moment has already passed today, schedule for tomorrow
-    if (scheduled <= now) {
-      scheduled.setDate(scheduled.getDate() + 1);
+      if (endDateStr && dateStr > endDateStr) return null;
+      if (!this.scheduleAppliesOnDate(repeatType, repeatDays, dateStr)) continue;
+
+      const medicationTime = this.buildMedicationDateTime(dateStr, remindTime);
+      if (medicationTime && medicationTime > now) return medicationTime;
     }
 
-    return scheduled;
+    return null;
+  }
+
+  private scheduleAppliesOnDate(repeatType: string, repeatDays: number[], dateStr: string) {
+    if (repeatType === 'daily') return true;
+    if (repeatType === 'specific_days') {
+      return repeatDays.includes(this.getVietnamDayOfWeek(dateStr));
+    }
+
+    return false;
+  }
+
+  private buildMedicationDateTime(dateStr: string, remindTime: string | null) {
+    if (!remindTime) return null;
+
+    const [hour, minute] = remindTime.split(':');
+    if (!hour || !minute) return null;
+
+    const hh = hour.padStart(2, '0');
+    const mm = minute.padStart(2, '0');
+    const medicationTime = new Date(`${dateStr}T${hh}:${mm}:00.000+07:00`);
+
+    return isNaN(medicationTime.getTime()) ? null : medicationTime;
+  }
+
+  private getVietnamDayOfWeek(dateStr: string) {
+    return new Date(`${dateStr}T12:00:00.000+07:00`).getUTCDay();
+  }
+
+  private formatDateInVietnam(date: Date) {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Ho_Chi_Minh',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(date);
+
+    const year = parts.find((part) => part.type === 'year')?.value;
+    const month = parts.find((part) => part.type === 'month')?.value;
+    const day = parts.find((part) => part.type === 'day')?.value;
+
+    return `${year}-${month}-${day}`;
   }
 }
