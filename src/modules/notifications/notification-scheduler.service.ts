@@ -85,10 +85,14 @@ export class NotificationSchedulerService {
           continue;
         }
 
+        if (!this.userMedicationAppliesOnDate(schedule.userMedication, dateStr)) {
+          continue;
+        }
+
         const medicationTime = this.buildMedicationDateTime(dateStr, schedule.remindTime);
         if (!medicationTime) continue;
 
-        const scheduledFor = new Date(medicationTime.getTime() - 60 * 60 * 1000);
+        const scheduledFor = new Date(medicationTime.getTime() - 15 * 60 * 1000);
         if (scheduledFor < windowStart || scheduledFor > windowEnd) continue;
 
         await this.notificationsService.createMedicationReminderNotifications({
@@ -138,6 +142,21 @@ export class NotificationSchedulerService {
     }
 
     return false;
+  }
+
+  private userMedicationAppliesOnDate(
+    userMedication: { startDate: Date | null; endDate: Date | null },
+    dateStr: string,
+  ) {
+    if (userMedication.startDate && this.formatDateInVietnam(userMedication.startDate) > dateStr) {
+      return false;
+    }
+
+    if (userMedication.endDate && this.formatDateInVietnam(userMedication.endDate) < dateStr) {
+      return false;
+    }
+
+    return true;
   }
 
   private buildMedicationDateTime(dateStr: string, remindTime: string | null) {
