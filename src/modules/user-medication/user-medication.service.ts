@@ -117,9 +117,17 @@ export class UserMedicationService {
 
     const cleanText = scannedText.trim().replace(/\s+/g, ' ');
 
-    // OCR text from mobile is usually accent-free, while medication names in DB are Vietnamese with accents.
-    const normalizedScanText = this.normalizeSearchText(cleanText);
-    const keywords = normalizedScanText.split(' ').filter((w) => w.length > 2);
+    let parsedRawScannedData: unknown = rawScannedData;
+    if (typeof rawScannedData === 'string' && rawScannedData.trim()) {
+      try {
+        parsedRawScannedData = JSON.parse(rawScannedData);
+      } catch {
+        parsedRawScannedData = { raw: rawScannedData };
+      }
+    }
+
+    const searchText = this.buildMedicationScanSearchText(cleanText, parsedRawScannedData);
+    const keywords = this.getSearchKeywords(searchText);
 
     let matchedMedicationId: string | null = null;
 
@@ -137,46 +145,48 @@ export class UserMedicationService {
       });
 
       if (candidates.length > 0) {
-        // Evaluate candidates to prevent false positives.
         const scoredCandidates = candidates.map((candidate) => {
           const searchableText = this.normalizeSearchText(
             [candidate.name, candidate.genericName, candidate.manufacturer]
               .filter(Boolean)
               .join(' '),
           );
+          const searchableTokens = searchableText.split(' ').filter((token) => token.length > 2);
 
           let score = 0;
           let matchedKeywordsCount = 0;
+          let strongMatchedKeywordsCount = 0;
 
           for (const kw of keywords) {
             if (searchableText.includes(kw)) {
-              score += kw.length;
+              score += kw.length * 2;
               matchedKeywordsCount++;
+              strongMatchedKeywordsCount++;
+              continue;
+            }
+
+            const fuzzyMatch = searchableTokens.some((token) =>
+              this.isLikelyOcrTokenMatch(kw, token),
+            );
+            if (fuzzyMatch) {
+              score += Math.max(4, kw.length - 1);
+              matchedKeywordsCount++;
+              if (kw.length >= 5) strongMatchedKeywordsCount++;
             }
           }
 
-          return { candidate, score, matchedKeywordsCount };
+          return { candidate, score, matchedKeywordsCount, strongMatchedKeywordsCount };
         });
 
         scoredCandidates.sort((a, b) => b.score - a.score);
         const bestMatch = scoredCandidates[0];
 
-        // Strict threshold
         if (
-          bestMatch.matchedKeywordsCount >= 2 ||
-          (bestMatch.matchedKeywordsCount === 1 && bestMatch.score >= 5)
+          bestMatch.strongMatchedKeywordsCount >= 1 &&
+          (bestMatch.matchedKeywordsCount >= 2 || bestMatch.score >= 7)
         ) {
           matchedMedicationId = bestMatch.candidate.id;
         }
-      }
-    }
-
-    let parsedRawScannedData: unknown = rawScannedData;
-    if (typeof rawScannedData === 'string' && rawScannedData.trim()) {
-      try {
-        parsedRawScannedData = JSON.parse(rawScannedData);
-      } catch {
-        parsedRawScannedData = { raw: rawScannedData };
       }
     }
 
@@ -232,6 +242,81 @@ export class UserMedicationService {
     const name = scannedText || fallbackName;
 
     return name.slice(0, 255);
+  }
+
+  private buildMedicationScanSearchText(scannedText: string, rawScannedData: unknown) {
+    const textParts = [scannedText];
+    this.collectScanTextParts(rawScannedData, textParts);
+
+    return [...new Set(textParts.map((part) => part.trim()).filter(Boolean))].join('\n');
+  }
+
+  private collectScanTextParts(value: unknown, textParts: string[]) {
+    if (typeof value === 'string') {
+      textParts.push(value);
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      for (const item of value) this.collectScanTextParts(item, textParts);
+      return;
+    }
+
+    if (!value || typeof value !== 'object') return;
+
+    const scanData = value as Record<string, unknown>;
+    for (const key of [
+      'scannedText',
+      'normalizedScannedText',
+      'originalScannedText',
+      'rawFullText',
+      'rawText',
+      'raw',
+      'lines',
+      'rawLines',
+      'rejectedLines',
+    ]) {
+      this.collectScanTextParts(scanData[key], textParts);
+    }
+  }
+
+  private getSearchKeywords(value: string) {
+    return [
+      ...new Set(
+        this.normalizeSearchText(value)
+          .split(' ')
+          .filter((word) => word.length > 2),
+      ),
+    ];
+  }
+
+  private isLikelyOcrTokenMatch(scannedToken: string, medicationToken: string) {
+    if (scannedToken.length < 4 || medicationToken.length < 4) return false;
+    if (Math.abs(scannedToken.length - medicationToken.length) > 2) return false;
+
+    const distance = this.levenshteinDistance(scannedToken, medicationToken);
+    const longestLength = Math.max(scannedToken.length, medicationToken.length);
+
+    return distance <= 1 || 1 - distance / longestLength >= 0.78;
+  }
+
+  private levenshteinDistance(left: string, right: string) {
+    const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+
+    for (let i = 0; i < left.length; i++) {
+      let diagonal = previous[0];
+      previous[0] = i + 1;
+
+      for (let j = 0; j < right.length; j++) {
+        const insertion = previous[j + 1] + 1;
+        const deletion = previous[j] + 1;
+        const substitution = diagonal + (left[i] === right[j] ? 0 : 1);
+        diagonal = previous[j + 1];
+        previous[j + 1] = Math.min(insertion, deletion, substitution);
+      }
+    }
+
+    return previous[right.length];
   }
 
   private normalizeSearchText(value: string) {
