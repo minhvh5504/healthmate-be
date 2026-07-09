@@ -9,6 +9,9 @@ import { MessageCodes } from '../../common/constants/message-codes.const';
 export class ReminderSchedulesService {
   constructor(private prisma: PrismaService) {}
 
+  /**
+   * Create reminder schedule
+   */
   async create(dto: CreateReminderScheduleDto, userId: string) {
     // 1. Verify UserMedication existence and ownership
     const userMedication = await this.prisma.userMedication.findUnique({
@@ -17,17 +20,17 @@ export class ReminderSchedulesService {
 
     if (!userMedication) {
       throw new NotFoundException(
-        ResponseHelper.error(MessageCodes.MEDICATION_NOT_FOUND, 'Không tìm thấy thuốc của người dùng', 404),
+        ResponseHelper.error(
+          MessageCodes.MEDICATION_NOT_FOUND,
+          'Không tìm thấy thuốc của người dùng',
+          404,
+        ),
       );
     }
 
     if (userMedication.userId !== userId) {
       throw new ForbiddenException(
-        ResponseHelper.error(
-          MessageCodes.INSUFFICIENT_PERMISSIONS,
-          'Bạn không có đủ quyền',
-          403,
-        ),
+        ResponseHelper.error(MessageCodes.INSUFFICIENT_PERMISSIONS, 'Bạn không có đủ quyền', 403),
       );
     }
 
@@ -43,6 +46,9 @@ export class ReminderSchedulesService {
     );
   }
 
+  /**
+   * Get schedules by user medication
+   */
   async findByUserMedication(userMedicationId: string, userId: string) {
     // Ownership check
     const userMedication = await this.prisma.userMedication.findUnique({
@@ -71,6 +77,9 @@ export class ReminderSchedulesService {
     );
   }
 
+  /**
+   * Update reminder schedule
+   */
   async update(id: string, dto: UpdateReminderScheduleDto, userId: string) {
     const existing = await this.prisma.reminderSchedule.findUnique({
       where: { id },
@@ -89,11 +98,7 @@ export class ReminderSchedulesService {
 
     if (existing.userMedication.userId !== userId) {
       throw new ForbiddenException(
-        ResponseHelper.error(
-          MessageCodes.INSUFFICIENT_PERMISSIONS,
-          'Bạn không có đủ quyền',
-          403,
-        ),
+        ResponseHelper.error(MessageCodes.INSUFFICIENT_PERMISSIONS, 'Bạn không có đủ quyền', 403),
       );
     }
 
@@ -109,6 +114,9 @@ export class ReminderSchedulesService {
     );
   }
 
+  /**
+   * Delete reminder schedule
+   */
   async remove(id: string, userId: string) {
     const existing = await this.prisma.reminderSchedule.findUnique({
       where: { id },
@@ -127,11 +135,7 @@ export class ReminderSchedulesService {
 
     if (existing.userMedication.userId !== userId) {
       throw new ForbiddenException(
-        ResponseHelper.error(
-          MessageCodes.INSUFFICIENT_PERMISSIONS,
-          'Bạn không có đủ quyền',
-          403,
-        ),
+        ResponseHelper.error(MessageCodes.INSUFFICIENT_PERMISSIONS, 'Bạn không có đủ quyền', 403),
       );
     }
 

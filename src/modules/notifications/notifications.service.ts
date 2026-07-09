@@ -51,6 +51,9 @@ export class NotificationsService {
     private readonly fcmService: FcmService,
   ) {}
 
+  /**
+   * Get notifications by user
+   */
   async findAll(userId: string, query: QueryNotificationDto) {
     const { isRead, type, search, limit = 20, page = 1 } = query;
     const skip = (page - 1) * limit;
@@ -86,6 +89,9 @@ export class NotificationsService {
     };
   }
 
+  /**
+   * Get unread notification count
+   */
   async getUnreadCount(userId: string) {
     const count = await this.prisma.notification.count({
       where: { userId, isRead: false, deliveryStatus: 'sent' },
@@ -93,6 +99,9 @@ export class NotificationsService {
     return { unreadCount: count };
   }
 
+  /**
+   * Get notification by id
+   */
   async findOne(userId: string, id: string) {
     const notification = await this.prisma.notification.findFirst({
       where: { id, userId },
@@ -105,6 +114,9 @@ export class NotificationsService {
     return notification;
   }
 
+  /**
+   * Create notification
+   */
   async create(userId: string, dto: CreateNotificationDto) {
     const targetUserId = dto.userId || userId;
 
@@ -134,12 +146,15 @@ export class NotificationsService {
     });
     this.realtimeGateway.emitUnreadCountToUser(targetUserId, unreadCount);
 
-    // Send FCM push notification (background / terminated) — fire & forget
+    // Send FCM push notification (background / terminated) - fire and forget
     void this.sendFcmToUserDevices(targetUserId, dto.title, dto.body);
 
     return notification;
   }
 
+  /**
+   * Mark notification as read
+   */
   async markAsRead(userId: string, id: string) {
     const updated = await this.prisma.notification.update({
       where: { id, userId },
@@ -152,6 +167,9 @@ export class NotificationsService {
     return updated;
   }
 
+  /**
+   * Mark notifications as read
+   */
   async markReadBulk(userId: string, ids?: string[], all?: boolean) {
     const where: Prisma.NotificationUpdateManyArgs['where'] = {
       userId,
@@ -226,13 +244,16 @@ export class NotificationsService {
       notification as unknown as Record<string, unknown>,
     );
 
-    // 3. FCM push (background / terminated) — fire & forget
+    // 3. FCM push (background / terminated) - fire and forget
     void this.sendFcmToUserDevices(notification.userId, notification.title, notification.body);
 
     // 4. Update badge count
     await this.refreshUnreadBadge(notification.userId);
   }
 
+  /**
+   * Delete notification
+   */
   async remove(userId: string, id: string) {
     const notification = await this.prisma.notification.findFirst({
       where: { id, userId },
@@ -245,6 +266,9 @@ export class NotificationsService {
     return await this.prisma.notification.delete({ where: { id } });
   }
 
+  /**
+   * Delete notifications
+   */
   async removeBulk(userId: string, ids?: string[], all?: boolean) {
     const where: Prisma.NotificationDeleteManyArgs['where'] = { userId };
 
@@ -280,7 +304,7 @@ export class NotificationsService {
       },
     });
 
-    // Chỉ gửi ngay nếu không phải là lịch hẹn trong tương lai
+    // Send immediately unless this is a future schedule
     if (!isFuture) {
       // Real-time WebSocket push (foreground)
       this.realtimeGateway.emitNotificationToUser(
@@ -288,11 +312,11 @@ export class NotificationsService {
         notification as unknown as Record<string, unknown>,
       );
 
-      // FCM push (background / terminated) — fire & forget
+      // FCM push (background / terminated) - fire and forget
       void this.sendFcmToUserDevices(payload.userId, payload.title, payload.body, payload.fcmData);
     }
 
-    // Luôn cập nhật badge số thông báo chưa đọc
+    // Always refresh unread badge count
     const unreadCount = await this.prisma.notification.count({
       where: { userId: payload.userId, isRead: false, deliveryStatus: 'sent' },
     });
@@ -301,6 +325,9 @@ export class NotificationsService {
     return notification;
   }
 
+  /**
+   * Create medication reminder notifications
+   */
   async createMedicationReminderNotifications(payload: CreateMedicationReminderPayload) {
     const userMedication = await this.prisma.userMedication.findUnique({
       where: { id: payload.userMedicationId },
@@ -358,6 +385,9 @@ export class NotificationsService {
     return [ownerNotification, ...relatedNotifications];
   }
 
+  /**
+   * Create low stock reminder notifications
+   */
   async createMedicationStockReminderNotifications(payload: CreateMedicationStockReminderPayload) {
     if (payload.stockCount > payload.lowStockThreshold) {
       return [];
@@ -411,6 +441,9 @@ export class NotificationsService {
     return [ownerNotification, ...relatedNotifications];
   }
 
+  /**
+   * Cancel pending medication reminders
+   */
   async cancelPendingMedicationRemindersForUserMedication(userMedicationId: string) {
     const schedules = await this.prisma.reminderSchedule.findMany({
       where: { userMedicationId },
@@ -434,6 +467,9 @@ export class NotificationsService {
     });
   }
 
+  /**
+   * Register device token
+   */
   async registerDeviceToken(userId: string, dto: { token: string; platform: string }) {
     return await this.prisma.deviceToken.upsert({
       where: { token: dto.token },
@@ -452,6 +488,9 @@ export class NotificationsService {
     });
   }
 
+  /**
+   * Unregister device token
+   */
   async unregisterDeviceToken(userId: string, token: string) {
     if (!token) return { count: 0 };
 
@@ -464,6 +503,9 @@ export class NotificationsService {
   // PRIVATE HELPERS
   // ============================================
 
+  /**
+   * Create medication reminder when missing
+   */
   private async createMedicationReminderIfNotExists(
     payload: MedicationReminderNotificationPayload,
   ): Promise<Notification> {
@@ -483,6 +525,9 @@ export class NotificationsService {
     return this.createNotification(payload);
   }
 
+  /**
+   * Create stock reminder when missing
+   */
   private async createMedicationStockReminderIfNotExists(
     payload: CreateNotificationPayload,
   ): Promise<Notification> {
@@ -504,6 +549,9 @@ export class NotificationsService {
     return this.createNotification(payload);
   }
 
+  /**
+   * Get accepted related user ids
+   */
   private async getAcceptedRelatedUserIds(userId: string) {
     const relationships = await this.prisma.userRelationship.findMany({
       where: {
@@ -527,6 +575,9 @@ export class NotificationsService {
     ];
   }
 
+  /**
+   * Get user display name
+   */
   private async getUserDisplayName(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -544,6 +595,9 @@ export class NotificationsService {
     return user?.profile?.fullName || user?.username || user?.email || 'người thân của bạn';
   }
 
+  /**
+   * Format medication dose text
+   */
   private formatMedicationDose(dosage: string | null | undefined, medicationName: string) {
     return [dosage?.trim(), medicationName.trim()].filter(Boolean).join(' ');
   }

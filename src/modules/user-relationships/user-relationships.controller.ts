@@ -93,7 +93,7 @@ export class UserRelationshipsController {
 
   @Public()
   @Post('accept-by-token')
-  @ApiOperation({ summary: 'Accept a relationship via token (mobile JSON API — no redirect)' })
+  @ApiOperation({ summary: 'Accept a relationship via token' })
   @ApiResponse({ status: 200, description: 'Invitation accepted' })
   async acceptByTokenMobile(@Body() body: { token: string }) {
     if (!body?.token) {

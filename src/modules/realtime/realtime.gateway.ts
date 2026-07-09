@@ -33,7 +33,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   private logger = new Logger('RealtimeGateway');
 
   /**
-   * Map: userId → Set of socketIds (1 user có thể kết nối nhiều thiết bị cùng lúc)
+   * Map user ids to active socket ids
    */
   private userSockets = new Map<string, Set<string>>();
 
@@ -52,7 +52,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       const userId = this.extractUserIdFromSocket(client);
 
       if (!userId) {
-        this.logger.warn(`Client ${client.id} connected without valid token → disconnecting`);
+        this.logger.warn(`Client ${client.id} connected without valid token -> disconnecting`);
         client.disconnect();
         return;
       }
@@ -70,7 +70,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       await client.join(`user:${userId}`);
 
       this.logger.log(
-        `✅ User [${userId}] connected → socket: ${client.id} (total: ${this.userSockets.get(userId)!.size})`,
+        `✅ User [${userId}] connected -> socket: ${client.id} (total: ${this.userSockets.get(userId)!.size})`,
       );
 
       // Push initial unread count upon connection
@@ -95,18 +95,18 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
           this.userSockets.delete(userId);
         }
       }
-      this.logger.log(`❌ User [${userId}] disconnected → socket: ${client.id}`);
+      this.logger.log(`❌ User [${userId}] disconnected -> socket: ${client.id}`);
     } else {
       this.logger.log(`Client ${client.id} disconnected (unauthenticated)`);
     }
   }
 
   // ============================================
-  // CLIENT → SERVER EVENTS
+  // CLIENT TO SERVER EVENTS
   // ============================================
 
   /**
-   * Client ping để kiểm tra kết nối vẫn sống
+   * Check that the socket connection is alive
    */
   @SubscribeMessage('ping')
   handlePing() {
@@ -114,7 +114,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   /**
-   * Client join room của user (legacy support - vẫn hỗ trợ cho client cũ)
+   * Join the user room for legacy clients
    */
   @SubscribeMessage('join:user')
   async handleJoinUser(@ConnectedSocket() client: Socket, @MessageBody() data: { userId: string }) {
@@ -133,19 +133,19 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   // ============================================
-  // SERVER → CLIENT EMIT METHODS
+  // SERVER TO CLIENT EMIT METHODS
   // (Called from NotificationsService and other services)
   // ============================================
 
   /**
-   * Gửi thông báo mới tới một user cụ thể (kể cả họ đang mở nhiều thiết bị cùng lúc)
+   * Emit a new notification to one user
    */
   emitNotificationToUser(userId: string, notification: Record<string, unknown>) {
     const room = `user:${userId}`;
     this.server.to(room).emit('notification:new', notification);
 
     const isOnline = this.isUserOnline(userId);
-    this.logger.log(`📢 Emitted notification:new to user [${userId}] — online: ${isOnline}`);
+    this.logger.log(`📢 Emitted notification:new to user [${userId}] - online: ${isOnline}`);
   }
 
   /**
@@ -156,7 +156,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   /**
-   * Cập nhật badge số thông báo chưa đọc cho user
+   * Emit unread notification count to one user
    */
   emitUnreadCountToUser(userId: string, unreadCount: number) {
     const room = `user:${userId}`;
@@ -186,7 +186,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   // ============================================
 
   /**
-   * Kiểm tra user có đang kết nối WebSocket không
+   * Check whether a user is connected
    */
   isUserOnline(userId: string): boolean {
     const sockets = this.userSockets.get(userId);
@@ -194,7 +194,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   /**
-   * Lấy danh sách userId đang online
+   * Get online user ids
    */
   getOnlineUserIds(): string[] {
     return Array.from(this.userSockets.keys());
@@ -206,7 +206,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
 
   private extractUserIdFromSocket(client: Socket): string | null {
     try {
-      // Client gửi token qua query param hoặc header Authorization
+      // Read token from query param or Authorization header
       const token =
         (client.handshake.query?.token as string) ||
         client.handshake.headers?.authorization?.replace('Bearer ', '');

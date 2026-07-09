@@ -2,6 +2,12 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { Injectable } from '@nestjs/common';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import {
+  HealthHistoryChangesQueryDto,
+  HealthHistoryMetric,
+  HealthHistoryPeriod,
+  HealthHistoryQueryDto,
+} from './dto/health-history-query.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { ResponseHelper } from '../../common/interfaces/api-response.interface';
 import { MessageCodes } from '../../common/constants/message-codes.const';
@@ -219,6 +225,161 @@ export class ProfileService {
       updatedProfile,
       MessageCodes.USER_UPDATED,
       'Cập nhật hồ sơ thành công',
+      200,
+    );
+  }
+
+  /**
+   * Get health history chart data by period.
+   */
+  async getHealthHistory(userId: string, query: HealthHistoryQueryDto) {
+    const metric = query.metric ?? HealthHistoryMetric.weight;
+    const period = query.period ?? HealthHistoryPeriod.day;
+    const referenceDate = query.date ? new Date(query.date) : new Date();
+    const { startDate, endDate } = this.getPeriodRange(period, referenceDate);
+
+    const profile = await this.getActiveUserProfile(userId, 'Lấy lịch sử sức khỏe thất bại');
+    const field = this.getMetricField(metric);
+    const unit = this.getMetricUnit(metric);
+    const currentValue =
+      profile[field] !== null && profile[field] !== undefined ? Number(profile[field]) : null;
+
+    const logs = await this.prisma.userHealthLog.findMany({
+      where: {
+        userId,
+        recordedAt: { gte: startDate, lt: endDate },
+        [field]: { not: null },
+      },
+      orderBy: { recordedAt: 'asc' },
+      select: {
+        id: true,
+        recordedAt: true,
+        weightKg: true,
+        heightCm: true,
+      },
+    });
+
+    const buckets = new Map<
+      string,
+      { value: number; recordedAt: Date; label: string; index: number; count: number }
+    >();
+
+    for (const log of logs) {
+      const value = log[field] !== null && log[field] !== undefined ? Number(log[field]) : null;
+      if (value === null) continue;
+
+      const bucket = this.getHistoryBucket(period, log.recordedAt);
+      const existing = buckets.get(bucket.key);
+
+      if (existing) {
+        existing.count += 1;
+        if (log.recordedAt >= existing.recordedAt) {
+          existing.value = value;
+          existing.recordedAt = log.recordedAt;
+          existing.label = bucket.label;
+          existing.index = bucket.index;
+        }
+      } else {
+        buckets.set(bucket.key, {
+          value,
+          recordedAt: log.recordedAt,
+          label: bucket.label,
+          index: bucket.index,
+          count: 1,
+        });
+      }
+    }
+
+    const points = Array.from(buckets.values())
+      .map((bucket) => ({
+        index: bucket.index,
+        label: bucket.label,
+        value: this.roundMetric(bucket.value),
+        recordedAt: bucket.recordedAt,
+        count: bucket.count,
+      }))
+      .sort((a, b) => a.index - b.index);
+
+    const averageValue =
+      points.length > 0
+        ? this.roundMetric(points.reduce((sum, point) => sum + point.value, 0) / points.length)
+        : null;
+
+    return ResponseHelper.success(
+      {
+        metric,
+        period,
+        unit,
+        currentValue: currentValue !== null ? this.roundMetric(currentValue) : null,
+        averageValue,
+        startDate,
+        endDate,
+        points,
+      },
+      MessageCodes.PROFILE_RETRIEVED,
+      'Lấy lịch sử sức khỏe thành công',
+      200,
+    );
+  }
+
+  /**
+   * Get raw metric changes with delta against the previous recorded value.
+   */
+  async getHealthHistoryChanges(userId: string, query: HealthHistoryChangesQueryDto) {
+    const metric = query.metric ?? HealthHistoryMetric.weight;
+    const period = query.period ?? HealthHistoryPeriod.day;
+    const referenceDate = query.date ? new Date(query.date) : new Date();
+    const { startDate, endDate } = this.getPeriodRange(period, referenceDate);
+    const field = this.getMetricField(metric);
+    const unit = this.getMetricUnit(metric);
+
+    await this.getActiveUserProfile(userId, 'Lấy lịch sử thay đổi sức khỏe thất bại');
+
+    const logs = await this.prisma.userHealthLog.findMany({
+      where: {
+        userId,
+        recordedAt: { gte: startDate, lt: endDate },
+        [field]: { not: null },
+      },
+      orderBy: { recordedAt: 'asc' },
+      select: {
+        id: true,
+        recordedAt: true,
+        weightKg: true,
+        heightCm: true,
+        bmi: true,
+        bmiStatus: true,
+      },
+    });
+
+    let previousValue: number | null = null;
+    const changes = logs.map((log) => {
+      const value = Number(log[field]);
+      const change = previousValue !== null ? this.roundMetric(value - previousValue) : null;
+      const item = {
+        id: log.id,
+        metric,
+        unit,
+        value: this.roundMetric(value),
+        previousValue: previousValue !== null ? this.roundMetric(previousValue) : null,
+        change,
+        direction: change === null ? 'initial' : change > 0 ? 'up' : change < 0 ? 'down' : 'same',
+        bmi: log.bmi !== null && log.bmi !== undefined ? Number(log.bmi) : null,
+        bmiStatus: log.bmiStatus,
+        recordedAt: log.recordedAt,
+      };
+      previousValue = value;
+      return item;
+    });
+
+    return ResponseHelper.success(
+      {
+        metric,
+        unit,
+        changes: changes.reverse(),
+      },
+      MessageCodes.PROFILE_RETRIEVED,
+      'Lấy lịch sử thay đổi sức khỏe thành công',
       200,
     );
   }
@@ -459,6 +620,133 @@ export class ProfileService {
       'Xóa người dùng thành công',
       200,
     );
+  }
+
+  private async getActiveUserProfile(userId: string, failureTitle: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { profile: true },
+    });
+
+    if (!user || !user.profile) {
+      throw new ApiException(
+        MessageCodes.USER_NOT_FOUND,
+        'Không tìm thấy hồ sơ người dùng',
+        404,
+        failureTitle,
+      );
+    }
+
+    if (!user.isActive) {
+      throw new ApiException(
+        MessageCodes.ACCOUNT_DISABLED,
+        'Tài khoản của bạn đã bị vô hiệu hóa hoặc khóa. Vui lòng liên hệ quản trị viên để mở khóa.',
+        401,
+        failureTitle,
+      );
+    }
+
+    return user.profile;
+  }
+
+  private getMetricField(metric: HealthHistoryMetric) {
+    return metric === HealthHistoryMetric.height ? 'heightCm' : 'weightKg';
+  }
+
+  private getMetricUnit(metric: HealthHistoryMetric) {
+    return metric === HealthHistoryMetric.height ? 'cm' : 'kg';
+  }
+
+  private getPeriodRange(period: HealthHistoryPeriod, referenceDate: Date) {
+    const date = Number.isNaN(referenceDate.getTime()) ? new Date() : referenceDate;
+    const parts = this.getVietnamDateParts(date);
+
+    switch (period) {
+      case HealthHistoryPeriod.day: {
+        const startDate = this.vietnamDateToUtc(parts.year, parts.month, parts.day);
+        const endDate = this.vietnamDateToUtc(parts.year, parts.month, parts.day + 1);
+        return { startDate, endDate };
+      }
+      case HealthHistoryPeriod.week: {
+        const mondayOffset = (parts.weekday + 6) % 7;
+        const startDate = this.vietnamDateToUtc(parts.year, parts.month, parts.day - mondayOffset);
+        const endDate = this.vietnamDateToUtc(
+          parts.year,
+          parts.month,
+          parts.day - mondayOffset + 7,
+        );
+        return { startDate, endDate };
+      }
+      case HealthHistoryPeriod.month: {
+        const startDate = this.vietnamDateToUtc(parts.year, parts.month, 1);
+        const endDate = this.vietnamDateToUtc(parts.year, parts.month + 1, 1);
+        return { startDate, endDate };
+      }
+    }
+  }
+
+  private getHistoryBucket(period: HealthHistoryPeriod, recordedAt: Date) {
+    const parts = this.getVietnamDateParts(recordedAt);
+
+    switch (period) {
+      case HealthHistoryPeriod.day: {
+        const bucketHour = Math.floor(parts.hour / 4) * 4;
+        return {
+          key: `${this.formatDateKey(parts.year, parts.month, parts.day)}-${String(bucketHour).padStart(2, '0')}`,
+          label: String(bucketHour),
+          index: bucketHour,
+        };
+      }
+      case HealthHistoryPeriod.week: {
+        const index = (parts.weekday + 6) % 7;
+        const labels = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+        return {
+          key: this.formatDateKey(parts.year, parts.month, parts.day),
+          label: labels[index],
+          index,
+        };
+      }
+      case HealthHistoryPeriod.month: {
+        const mondayOffset = (parts.weekday + 6) % 7;
+        const weekStart = new Date(Date.UTC(parts.year, parts.month, parts.day - mondayOffset));
+        return {
+          key: this.formatDateKey(
+            weekStart.getUTCFullYear(),
+            weekStart.getUTCMonth(),
+            weekStart.getUTCDate(),
+          ),
+          label: String(parts.day),
+          index: parts.day - 1,
+        };
+      }
+    }
+  }
+
+  private vietnamDateToUtc(year: number, month: number, day: number) {
+    return new Date(Date.UTC(year, month, day) - this.vietnamTimezoneOffsetMs());
+  }
+
+  private getVietnamDateParts(date: Date) {
+    const vietnamDate = new Date(date.getTime() + this.vietnamTimezoneOffsetMs());
+    return {
+      year: vietnamDate.getUTCFullYear(),
+      month: vietnamDate.getUTCMonth(),
+      day: vietnamDate.getUTCDate(),
+      hour: vietnamDate.getUTCHours(),
+      weekday: vietnamDate.getUTCDay(),
+    };
+  }
+
+  private vietnamTimezoneOffsetMs() {
+    return 7 * 60 * 60 * 1000;
+  }
+
+  private formatDateKey(year: number, month: number, day: number) {
+    return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  }
+
+  private roundMetric(value: number) {
+    return Number(value.toFixed(1));
   }
 
   /**

@@ -9,6 +9,9 @@ import { MessageCodes } from '../../common/constants/message-codes.const';
 export class MedicationConditionsService {
   constructor(private prisma: PrismaService) {}
 
+  /**
+   * Create medication condition
+   */
   async create(dto: CreateMedicationConditionDto) {
     const existing = await this.prisma.medicationCondition.findUnique({
       where: { slug: dto.slug },
@@ -16,11 +19,7 @@ export class MedicationConditionsService {
 
     if (existing) {
       throw new ConflictException(
-        ResponseHelper.error(
-          MessageCodes.MEDICATION_CONDITION_SLUG_EXISTS,
-          'Slug đã tồn tại',
-          409,
-        ),
+        ResponseHelper.error(MessageCodes.MEDICATION_CONDITION_SLUG_EXISTS, 'Slug đã tồn tại', 409),
       );
     }
 
@@ -35,6 +34,9 @@ export class MedicationConditionsService {
     );
   }
 
+  /**
+   * Get all medication conditions
+   */
   async findAll() {
     const conditions = await this.prisma.medicationCondition.findMany({
       orderBy: { sortOrder: 'asc' },
@@ -47,6 +49,9 @@ export class MedicationConditionsService {
     );
   }
 
+  /**
+   * Get active medication conditions
+   */
   async findActive() {
     const conditions = await this.prisma.medicationCondition.findMany({
       where: { isActive: true },
@@ -60,6 +65,9 @@ export class MedicationConditionsService {
     );
   }
 
+  /**
+   * Get medication condition by id
+   */
   async findOne(id: string) {
     const condition = await this.prisma.medicationCondition.findUnique({
       where: { id },
@@ -82,6 +90,9 @@ export class MedicationConditionsService {
     );
   }
 
+  /**
+   * Update medication condition
+   */
   async update(id: string, dto: UpdateMedicationConditionDto) {
     const existing = await this.prisma.medicationCondition.findUnique({
       where: { id },
@@ -124,6 +135,9 @@ export class MedicationConditionsService {
     );
   }
 
+  /**
+   * Delete medication condition
+   */
   async remove(id: string) {
     const existing = await this.prisma.medicationCondition.findUnique({
       where: { id },

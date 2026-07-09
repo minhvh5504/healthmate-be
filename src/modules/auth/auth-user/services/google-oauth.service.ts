@@ -15,6 +15,9 @@ export interface GoogleUserInfo {
 export class GoogleOAuthService implements OnModuleInit {
   constructor(private readonly configService: ConfigService) {}
 
+  /**
+   * Initialize Google OAuth app
+   */
   onModuleInit() {
     if (admin.apps.length > 0) return;
 
@@ -38,6 +41,9 @@ export class GoogleOAuthService implements OnModuleInit {
     });
   }
 
+  /**
+   * Verify Google ID token
+   */
   async verifyIdToken(idToken: string): Promise<GoogleUserInfo> {
     try {
       const decoded = await admin.auth().verifyIdToken(idToken);

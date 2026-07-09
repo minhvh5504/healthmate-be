@@ -14,6 +14,9 @@ export class AiService {
     private readonly prisma: PrismaService,
   ) {}
 
+  /**
+   * Get AI chat history
+   */
   async getHistory(userId: string) {
     return await this.prisma.aiMessage.findMany({
       where: { userId },
@@ -21,6 +24,9 @@ export class AiService {
     });
   }
 
+  /**
+   * Clear AI chat history
+   */
   async clearHistory(userId: string) {
     const result = await this.prisma.aiMessage.deleteMany({
       where: { userId },
@@ -29,6 +35,9 @@ export class AiService {
     return { deletedCount: result.count };
   }
 
+  /**
+   * Stream AI chat response
+   */
   chatStream(
     historyMessages: ChatMessage[],
     userMessage: string,

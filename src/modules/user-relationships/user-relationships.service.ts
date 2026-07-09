@@ -23,10 +23,13 @@ export class UserRelationshipsService {
     private configService: ConfigService,
   ) {}
 
+  /**
+   * Invite a user to connect
+   */
   async invite(userId: string, inviteDto: InviteUserDto) {
     const { email } = inviteDto;
 
-    // 1. Find user to invite
+    // Find user to invite
     const relatedUser = await this.prisma.user.findUnique({
       where: { email },
       include: { profile: true },
@@ -38,7 +41,7 @@ export class UserRelationshipsService {
       );
     }
 
-    // Get current user info for the email
+    // Get current user
     const currentUser = await this.prisma.user.findUnique({
       where: { id: userId },
       include: { profile: true },
@@ -46,17 +49,25 @@ export class UserRelationshipsService {
 
     if (!currentUser) {
       throw new NotFoundException(
-        ResponseHelper.error(MessageCodes.USER_NOT_FOUND, 'Không tìm thấy người dùng hiện tại', 404),
+        ResponseHelper.error(
+          MessageCodes.USER_NOT_FOUND,
+          'Không tìm thấy người dùng hiện tại',
+          404,
+        ),
       );
     }
 
     if (relatedUser.id === userId) {
       throw new BadRequestException(
-        ResponseHelper.error('RELATIONSHIP.SELF_INVITE', 'Bạn không thể tự gửi lời mời cho chính mình', 400),
+        ResponseHelper.error(
+          'RELATIONSHIP.SELF_INVITE',
+          'Bạn không thể tự gửi lời mời cho chính mình',
+          400,
+        ),
       );
     }
 
-    // 2. Check if relationship already exists
+    // Check if relationship already exists
     const existing = await this.prisma.userRelationship.findFirst({
       where: {
         OR: [
@@ -68,11 +79,10 @@ export class UserRelationshipsService {
 
     if (existing) {
       if (existing.status === 'revoked') {
-        // Re-open revoked relationship
         const updated = await this.prisma.userRelationship.update({
           where: { id: existing.id },
           data: {
-            userId, // Current user becomes the inviter again
+            userId,
             relatedUserId: relatedUser.id,
             status: 'pending',
             invitedAt: new Date(),
@@ -80,11 +90,7 @@ export class UserRelationshipsService {
             revokedAt: null,
           },
         });
-        return ResponseHelper.success(
-          updated,
-          MessageCodes.RELATIONSHIP_INVITED,
-          'Đã gửi lời mời',
-        );
+        return ResponseHelper.success(updated, MessageCodes.RELATIONSHIP_INVITED, 'Đã gửi lời mời');
       }
 
       throw new ConflictException(
@@ -96,6 +102,7 @@ export class UserRelationshipsService {
       );
     }
 
+    // Check if the user has reached the maximum number
     const maxActiveRelationships = 5;
     const activeStatuses = ['pending', 'accepted'];
     const [currentUserRelationshipCount, relatedUserRelationshipCount] = await Promise.all([
@@ -113,6 +120,7 @@ export class UserRelationshipsService {
       }),
     ]);
 
+    // Check if the current user has reached the maximum number
     if (currentUserRelationshipCount >= maxActiveRelationships) {
       throw new BadRequestException(
         ResponseHelper.error(
@@ -123,6 +131,7 @@ export class UserRelationshipsService {
       );
     }
 
+    // Check if the related user has reached the maximum number
     if (relatedUserRelationshipCount >= maxActiveRelationships) {
       throw new BadRequestException(
         ResponseHelper.error(
@@ -133,7 +142,7 @@ export class UserRelationshipsService {
       );
     }
 
-    // 3. Create new relationship
+    // Create new relationship
     const relationship = await this.prisma.userRelationship.create({
       data: {
         userId,
@@ -142,7 +151,7 @@ export class UserRelationshipsService {
       },
     });
 
-    // 4. Create notification for the invited user
+    // Create notification for the invited user
     await this.notificationsService.createNotification({
       userId: relatedUser.id,
       type: 'RELATIONSHIP_INVITE',
@@ -151,13 +160,13 @@ export class UserRelationshipsService {
       iconType: 'user_plus',
     });
 
-    // 5. Generate a secure token for one-click acceptance (valid for 24h)
+    // Generate a secure token for one-click acceptance (valid for 24h)
     const invitationToken = this.jwtService.sign(
       { relationshipId: relationship.id, type: 'connection_invite' },
       { expiresIn: '24h' },
     );
 
-    // 6. Send invitation email with Deep Link + Token
+    // Send invitation email with Deep Link + Token
     void this.mailService.sendConnectionInvitation({
       toEmail: relatedUser.email,
       inviterName: currentUser.profile?.fullName || 'Người dùng Healthmate',
@@ -176,6 +185,9 @@ export class UserRelationshipsService {
     );
   }
 
+  /**
+   * Accept an invitation to connect
+   */
   async accept(relationshipId: string, currentUserId: string) {
     const relationship = await this.prisma.userRelationship.findUnique({
       where: { id: relationshipId },
@@ -183,7 +195,11 @@ export class UserRelationshipsService {
 
     if (!relationship) {
       throw new NotFoundException(
-        ResponseHelper.error(MessageCodes.RELATIONSHIP_NOT_FOUND, 'Không tìm thấy mối liên kết', 404),
+        ResponseHelper.error(
+          MessageCodes.RELATIONSHIP_NOT_FOUND,
+          'Không tìm thấy mối liên kết',
+          404,
+        ),
       );
     }
 
@@ -215,7 +231,7 @@ export class UserRelationshipsService {
       },
     });
 
-    // Notify the inviter
+    // Notify inviter
     await this.notificationsService.createNotification({
       userId: relationship.userId,
       type: 'RELATIONSHIP_ACCEPTED',
@@ -231,6 +247,9 @@ export class UserRelationshipsService {
     );
   }
 
+  /**
+   * Revoke relationship
+   */
   async revoke(relationshipId: string, currentUserId: string) {
     const relationship = await this.prisma.userRelationship.findUnique({
       where: { id: relationshipId },
@@ -238,7 +257,11 @@ export class UserRelationshipsService {
 
     if (!relationship) {
       throw new NotFoundException(
-        ResponseHelper.error(MessageCodes.RELATIONSHIP_NOT_FOUND, 'Không tìm thấy mối liên kết', 404),
+        ResponseHelper.error(
+          MessageCodes.RELATIONSHIP_NOT_FOUND,
+          'Không tìm thấy mối liên kết',
+          404,
+        ),
       );
     }
 
@@ -267,6 +290,9 @@ export class UserRelationshipsService {
     );
   }
 
+  /**
+   * Get user relationships
+   */
   async findAll(userId: string) {
     const relationships = await this.prisma.userRelationship.findMany({
       where: {
@@ -328,6 +354,9 @@ export class UserRelationshipsService {
     );
   }
 
+  /**
+   * Delete relationship
+   */
   async remove(relationshipId: string, currentUserId: string) {
     const relationship = await this.prisma.userRelationship.findUnique({
       where: { id: relationshipId },
@@ -335,7 +364,11 @@ export class UserRelationshipsService {
 
     if (!relationship) {
       throw new NotFoundException(
-        ResponseHelper.error(MessageCodes.RELATIONSHIP_NOT_FOUND, 'Không tìm thấy mối liên kết', 404),
+        ResponseHelper.error(
+          MessageCodes.RELATIONSHIP_NOT_FOUND,
+          'Không tìm thấy mối liên kết',
+          404,
+        ),
       );
     }
 
@@ -356,6 +389,9 @@ export class UserRelationshipsService {
     return ResponseHelper.success(null, MessageCodes.RELATIONSHIP_DELETED, 'Đã xóa mối liên kết');
   }
 
+  /**
+   * Accept relationship by token
+   */
   async acceptByToken(token: string) {
     try {
       const payload = this.jwtService.verify<{

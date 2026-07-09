@@ -13,6 +13,10 @@ import {
 } from '@nestjs/common';
 import { ProfileService } from './profile.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import {
+  HealthHistoryChangesQueryDto,
+  HealthHistoryQueryDto,
+} from './dto/health-history-query.dto';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -44,6 +48,29 @@ export class ProfileController {
   @ApiResponse({ status: 401, description: 'Unauthorized or account deactivated' })
   updateProfile(@CurrentUser('id') userId: string, @Body() updateProfileDto: UpdateProfileDto) {
     return this.profileService.updateProfile(userId, updateProfileDto);
+  }
+
+  @Get('health-history')
+  @Roles(Role.admin, Role.user)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Get health history chart data by period' })
+  @ApiResponse({ status: 200, description: 'Health history retrieved successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized or account deactivated' })
+  getHealthHistory(@CurrentUser('id') userId: string, @Query() query: HealthHistoryQueryDto) {
+    return this.profileService.getHealthHistory(userId, query);
+  }
+
+  @Get('health-history/changes')
+  @Roles(Role.admin, Role.user)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Get health metric change history' })
+  @ApiResponse({ status: 200, description: 'Health metric changes retrieved successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized or account deactivated' })
+  getHealthHistoryChanges(
+    @CurrentUser('id') userId: string,
+    @Query() query: HealthHistoryChangesQueryDto,
+  ) {
+    return this.profileService.getHealthHistoryChanges(userId, query);
   }
 
   @Get('health-analysis')

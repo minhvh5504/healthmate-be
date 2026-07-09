@@ -1,6 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 export interface ISmsService {
+  /**
+   * Send OTP code
+   */
   sendOtp(phone: string, otp: string): Promise<void>;
 }
 
@@ -8,6 +11,9 @@ export interface ISmsService {
 export class MockSmsService implements ISmsService {
   private readonly logger = new Logger(MockSmsService.name);
 
+  /**
+   * Send OTP code
+   */
   async sendOtp(phone: string, otp: string): Promise<void> {
     // Mock implementation - log OTP to console
     this.logger.log('='.repeat(60));
