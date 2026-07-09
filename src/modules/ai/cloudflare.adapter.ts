@@ -104,6 +104,9 @@ export class CloudflareAdapter {
     this.providers = this.orderProviders([...cloudflareProviders, ...groqProviders]);
   }
 
+  /**
+   * Process chat stream with tools
+   */
   async processChat(
     historyMessages: ChatMessage[],
     userMessage: string,
@@ -295,6 +298,9 @@ export class CloudflareAdapter {
     }
   }
 
+  /**
+   * Call AI stream with provider fallback
+   */
   private async callAiStreamWithFallback(messages: ChatMessage[], tools?: AiTool[]) {
     const providers = this.getProviderRotation();
     let lastError: unknown;
@@ -312,6 +318,9 @@ export class CloudflareAdapter {
     throw lastError instanceof Error ? lastError : new Error('Không còn provider AI khả dụng');
   }
 
+  /**
+   * Call one AI provider stream
+   */
   private async callProviderStream(
     provider: AiProviderConfig,
     messages: ChatMessage[],
@@ -337,6 +346,9 @@ export class CloudflareAdapter {
     return response;
   }
 
+  /**
+   * Build provider request body
+   */
   private buildRequestBody(
     provider: AiProviderConfig,
     messages: ChatMessage[],
@@ -358,6 +370,9 @@ export class CloudflareAdapter {
     return body;
   }
 
+  /**
+   * Build provider message payload
+   */
   private buildProviderMessages(provider: AiProviderConfig, messages: ChatMessage[]) {
     if (provider.name !== 'groq') {
       return messages;
@@ -391,6 +406,9 @@ export class CloudflareAdapter {
     });
   }
 
+  /**
+   * Get rotated provider list
+   */
   private getProviderRotation() {
     const providers = [...this.providers];
     const start = this.providerCursor % providers.length;
@@ -399,6 +417,9 @@ export class CloudflareAdapter {
     return [...providers.slice(start), ...providers.slice(0, start)];
   }
 
+  /**
+   * Read comma-separated env list
+   */
   private getEnvList(pluralKey: string, singleKey: string) {
     const pluralValue = this.configService.get<string>(pluralKey, '');
     const singleValue = this.configService.get<string>(singleKey, '');
@@ -410,6 +431,9 @@ export class CloudflareAdapter {
       .filter(Boolean);
   }
 
+  /**
+   * Order AI providers by config
+   */
   private orderProviders(providers: AiProviderConfig[]) {
     const order = this.configService
       .get<string>('AI_PROVIDER_ORDER', 'cloudflare,groq')

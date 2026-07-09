@@ -15,7 +15,7 @@ const prisma = new PrismaClient({ adapter });
 async function main() {
   console.log('💊 Bắt đầu import dữ liệu Medications vào Database...');
 
-  // Đường dẫn trỏ tới file json
+  // Resolve source JSON file path
   const jsonPath = path.resolve(__dirname, '../../thuoc/medications.json');
 
   if (!fs.existsSync(jsonPath)) {
@@ -23,13 +23,13 @@ async function main() {
     return;
   }
 
-  // Khai báo mảng chứa dữ liệu
+  // Load source data array
   const fileContent = fs.readFileSync(jsonPath, 'utf8');
   const rawData: any[] = JSON.parse(fileContent);
 
   console.log(`Tiến hành xử lý ${rawData.length} bản ghi...`);
 
-  // Đảm bảo dữ liệu từ file json không bị trùng lặp tên
+  // Deduplicate source data by medication name
   const uniqueDataMap = new Map<string, any>();
   for (const item of rawData) {
     if (item.name && !uniqueDataMap.has(item.name)) {
@@ -38,7 +38,7 @@ async function main() {
   }
   const uniqueData = Array.from(uniqueDataMap.values());
 
-  // XOÁ TOÀN BỘ DATA CŨ ĐỂ ĐỔ LẠI TỪ ĐẦU (Thep yêu cầu mới nhất)
+  // Clear existing data before reimporting
   console.log('🗑️ Xoá bỏ dữ liệu thuốc (Medications) cũ trong database...');
   await prisma.medication.deleteMany({});
 
@@ -46,7 +46,7 @@ async function main() {
     `🔍 File gốc có ${rawData.length} bản ghi, sau khi lọc trùng tên còn ${uniqueData.length} bản ghi.`,
   );
 
-  // Chỉ import các trường khớp 100% với schema.prisma (external_id, source_url, ... đã được loại bỏ)
+  // Import only fields that match schema.prisma
   const medicationsDataToInsert = uniqueData.map((item) => ({
     name: item.name,
     genericName: item.generic_name || null,
@@ -61,7 +61,7 @@ async function main() {
     return;
   }
 
-  // Insert bulk dữ liệu mới vào database
+  // Insert new data in bulk
   console.log(
     `Đang lưu (import) ${medicationsDataToInsert.length} loại thuốc chuẩn schema vào database...`,
   );

@@ -17,6 +17,9 @@ export class MailService {
     this.loadTemplates();
   }
 
+  /**
+   * Initialize Resend client
+   */
   private initializeResend() {
     const apiKey = this.configService.get<string>('RESEND_API_KEY');
     this.mailFrom = this.configService.get<string>('MAIL_FROM') || 'noreply@healthmate.dev';
@@ -158,7 +161,9 @@ export class MailService {
     }
   }
 
-  // Core method
+  /**
+   * Send email message
+   */
   async sendMail(
     to: string,
     subject: string,

@@ -16,6 +16,9 @@ export class MedicationLogsService {
     private notificationsService: NotificationsService,
   ) {}
 
+  /**
+   * Create medication log
+   */
   async create(dto: CreateMedicationLogDto, userId: string) {
     // 1. Ownership check
     const userMedication = await this.prisma.userMedication.findUnique({
@@ -107,6 +110,9 @@ export class MedicationLogsService {
     );
   }
 
+  /**
+   * Resolve taken quantity
+   */
   private async getTakenQuantity(
     logData: CreateMedicationLogDto,
     userMedicationQuantity: number | null,
@@ -129,6 +135,9 @@ export class MedicationLogsService {
     return userMedicationQuantity ?? 1;
   }
 
+  /**
+   * Get medication log history
+   */
   async findHistory(userId: string, userMedicationId?: string, range?: string, date?: string) {
     const referenceDate = date ? new Date(date) : new Date();
 
@@ -198,6 +207,9 @@ export class MedicationLogsService {
     );
   }
 
+  /**
+   * Update medication log
+   */
   async update(id: string, dto: UpdateMedicationLogDto, userId: string) {
     const existing = await this.prisma.medicationLog.findUnique({
       where: { id },
@@ -216,11 +228,7 @@ export class MedicationLogsService {
 
     if (existing.userMedication.userId !== userId) {
       throw new ForbiddenException(
-        ResponseHelper.error(
-          MessageCodes.INSUFFICIENT_PERMISSIONS,
-          'Bạn không có đủ quyền',
-          403,
-        ),
+        ResponseHelper.error(MessageCodes.INSUFFICIENT_PERMISSIONS, 'Bạn không có đủ quyền', 403),
       );
     }
 
@@ -236,6 +244,9 @@ export class MedicationLogsService {
     );
   }
 
+  /**
+   * Delete medication log
+   */
   async remove(id: string, userId: string) {
     const existing = await this.prisma.medicationLog.findUnique({
       where: { id },
@@ -254,11 +265,7 @@ export class MedicationLogsService {
 
     if (existing.userMedication.userId !== userId) {
       throw new ForbiddenException(
-        ResponseHelper.error(
-          MessageCodes.INSUFFICIENT_PERMISSIONS,
-          'Bạn không có đủ quyền',
-          403,
-        ),
+        ResponseHelper.error(MessageCodes.INSUFFICIENT_PERMISSIONS, 'Bạn không có đủ quyền', 403),
       );
     }
 
