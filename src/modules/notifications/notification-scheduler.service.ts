@@ -55,6 +55,9 @@ export class NotificationSchedulerService {
     }
   }
 
+  /**
+   * Ensure upcoming medication reminders
+   */
   private async ensureUpcomingMedicationReminders() {
     const now = new Date();
     const windowStart = new Date(now.getTime() - 2 * 60 * 1000);
@@ -107,6 +110,9 @@ export class NotificationSchedulerService {
     }
   }
 
+  /**
+   * Ensure low stock reminders
+   */
   private async ensureLowStockReminders() {
     const userMedications = await this.prisma.userMedication.findMany({
       where: {
@@ -135,6 +141,9 @@ export class NotificationSchedulerService {
     }
   }
 
+  /**
+   * Check schedule date match
+   */
   private scheduleAppliesOnDate(repeatType: string, repeatDays: number[], dateStr: string) {
     if (repeatType === 'daily') return true;
     if (repeatType === 'specific_days') {
@@ -144,6 +153,9 @@ export class NotificationSchedulerService {
     return false;
   }
 
+  /**
+   * Check medication date match
+   */
   private userMedicationAppliesOnDate(
     userMedication: { startDate: Date | null; endDate: Date | null },
     dateStr: string,
@@ -159,6 +171,9 @@ export class NotificationSchedulerService {
     return true;
   }
 
+  /**
+   * Build medication date time
+   */
   private buildMedicationDateTime(dateStr: string, remindTime: string | null) {
     if (!remindTime) return null;
 
@@ -172,6 +187,9 @@ export class NotificationSchedulerService {
     return isNaN(medicationTime.getTime()) ? null : medicationTime;
   }
 
+  /**
+   * Get Vietnam date strings
+   */
   private getVietnamDateStrings(base: Date, count: number) {
     const today = this.formatDateInVietnam(base);
     const baseNoon = new Date(`${today}T12:00:00.000+07:00`);
@@ -183,10 +201,16 @@ export class NotificationSchedulerService {
     });
   }
 
+  /**
+   * Get Vietnam day of week
+   */
   private getVietnamDayOfWeek(dateStr: string) {
     return new Date(`${dateStr}T12:00:00.000+07:00`).getUTCDay();
   }
 
+  /**
+   * Format date in Vietnam timezone
+   */
   private formatDateInVietnam(date: Date) {
     const parts = new Intl.DateTimeFormat('en-CA', {
       timeZone: 'Asia/Ho_Chi_Minh',

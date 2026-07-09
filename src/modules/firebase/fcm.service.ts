@@ -44,7 +44,7 @@ export class FcmService {
       });
       this.logger.debug(`FCM sent to token ...${payload.token.slice(-10)}`);
     } catch (error) {
-      // Invalid / expired token — log but don't crash the app
+      // Invalid or expired token - log but don't crash the app
       this.logger.error(`FCM send failed: ${(error as Error).message}`);
     }
   }

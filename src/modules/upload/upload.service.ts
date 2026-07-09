@@ -26,6 +26,9 @@ export class UploadService {
     private readonly prisma: PrismaService,
   ) {}
 
+  /**
+   * Upload medication icon
+   */
   async uploadIcon(
     file: Express.Multer.File | undefined,
   ): Promise<ReturnType<typeof ResponseHelper.success<UploadResult>>> {
@@ -53,6 +56,9 @@ export class UploadService {
     );
   }
 
+  /**
+   * Delete medication icon
+   */
   async deleteIcon(publicId: string | null | undefined): Promise<void> {
     if (!publicId) return;
 
@@ -67,6 +73,9 @@ export class UploadService {
     }
   }
 
+  /**
+   * Upload user avatar
+   */
   async uploadAvatar(
     file: Express.Multer.File | undefined,
     userId?: string,
@@ -101,6 +110,9 @@ export class UploadService {
     );
   }
 
+  /**
+   * Upload medication scan image
+   */
   async uploadMedicationScanImage(file: Express.Multer.File | undefined): Promise<UploadResult> {
     this.validateFile(file);
 
@@ -116,6 +128,9 @@ export class UploadService {
     return this.uploadBufferToCloudinary(file, 'healthmate/medication-scans');
   }
 
+  /**
+   * Upload prescription image
+   */
   async uploadPrescriptionImage(
     file: Express.Multer.File | undefined,
     prescriptionId: string,
@@ -134,6 +149,9 @@ export class UploadService {
     return this.uploadBufferToCloudinary(file, `healthmate/prescriptions/${prescriptionId}`);
   }
 
+  /**
+   * Delete user avatar
+   */
   async deleteAvatar(publicId: string | null | undefined): Promise<void> {
     if (!publicId) return;
 
@@ -148,7 +166,9 @@ export class UploadService {
     }
   }
 
-  // --- HELPER METHODS ---
+  /**
+   * Upload buffer to Cloudinary
+   */
   private async uploadBufferToCloudinary(
     file: Express.Multer.File,
     folder: string,
@@ -186,6 +206,9 @@ export class UploadService {
     });
   }
 
+  /**
+   * Validate uploaded file
+   */
   private validateFile(
     file: Express.Multer.File | undefined,
     maxFileSize = this.maxFileSize,
@@ -232,11 +255,14 @@ export class UploadService {
     }
   }
 
+  /**
+   * Ensure upload directory exists
+   */
   private async ensureUploadDir(uploadDir: string): Promise<void> {
     try {
       await fs.access(uploadDir);
     } catch {
-      // Directory doesn't exist, create it
+      // Create missing directory
       await fs.mkdir(uploadDir, { recursive: true });
     }
   }

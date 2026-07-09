@@ -237,6 +237,9 @@ export class UserMedicationService {
     );
   }
 
+  /**
+   * Build draft medication name
+   */
   private buildDraftMedicationName(scannedText: string) {
     const fallbackName = 'Không nhận diện được thuốc từ ảnh quét';
     const name = scannedText || fallbackName;
@@ -244,6 +247,9 @@ export class UserMedicationService {
     return name.slice(0, 255);
   }
 
+  /**
+   * Build scan search text
+   */
   private buildMedicationScanSearchText(scannedText: string, rawScannedData: unknown) {
     const textParts = [scannedText];
     this.collectScanTextParts(rawScannedData, textParts);
@@ -251,6 +257,9 @@ export class UserMedicationService {
     return [...new Set(textParts.map((part) => part.trim()).filter(Boolean))].join('\n');
   }
 
+  /**
+   * Collect scan text parts
+   */
   private collectScanTextParts(value: unknown, textParts: string[]) {
     if (typeof value === 'string') {
       textParts.push(value);
@@ -280,6 +289,9 @@ export class UserMedicationService {
     }
   }
 
+  /**
+   * Get search keywords
+   */
   private getSearchKeywords(value: string) {
     return [
       ...new Set(
@@ -290,6 +302,9 @@ export class UserMedicationService {
     ];
   }
 
+  /**
+   * Check likely OCR token match
+   */
   private isLikelyOcrTokenMatch(scannedToken: string, medicationToken: string) {
     if (scannedToken.length < 4 || medicationToken.length < 4) return false;
     if (Math.abs(scannedToken.length - medicationToken.length) > 2) return false;
@@ -300,6 +315,9 @@ export class UserMedicationService {
     return distance <= 1 || 1 - distance / longestLength >= 0.78;
   }
 
+  /**
+   * Calculate Levenshtein distance
+   */
   private levenshteinDistance(left: string, right: string) {
     const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
 
@@ -319,6 +337,9 @@ export class UserMedicationService {
     return previous[right.length];
   }
 
+  /**
+   * Normalize search text
+   */
   private normalizeSearchText(value: string) {
     return value
       .toLowerCase()
@@ -350,6 +371,9 @@ export class UserMedicationService {
     );
   }
 
+  /**
+   * Delete scan task
+   */
   async deleteScanTask(id: string, userId: string) {
     const task = await this.prisma.medicationScanTask.findFirst({
       where: { id, userId },
@@ -366,6 +390,9 @@ export class UserMedicationService {
     return ResponseHelper.success(null, 'SCAN_TASK_DELETED', 'Xóa tác vụ quét thành công');
   }
 
+  /**
+   * Get user medications
+   */
   async findAllByUser(userId: string) {
     const userMedications = await this.prisma.userMedication.findMany({
       where: { userId },
@@ -738,9 +765,8 @@ export class UserMedicationService {
     );
   }
   /**
-   * Remove user medication
+   * Create low stock reminder when needed
    */
-
   private async maybeCreateLowStockReminder(
     userMedication: {
       id: string;
@@ -770,6 +796,9 @@ export class UserMedicationService {
     });
   }
 
+  /**
+   * Remove user medication
+   */
   async remove(id: string, userId: string) {
     const existing = await this.prisma.userMedication.findFirst({
       where: { id, userId },
@@ -852,6 +881,9 @@ export class UserMedicationService {
     return null;
   }
 
+  /**
+   * Check schedule date match
+   */
   private scheduleAppliesOnDate(repeatType: string, repeatDays: number[], dateStr: string) {
     if (repeatType === 'daily') return true;
     if (repeatType === 'specific_days') {
@@ -861,6 +893,9 @@ export class UserMedicationService {
     return false;
   }
 
+  /**
+   * Build medication date time
+   */
   private buildMedicationDateTime(dateStr: string, remindTime: string | null) {
     if (!remindTime) return null;
 
@@ -874,10 +909,16 @@ export class UserMedicationService {
     return isNaN(medicationTime.getTime()) ? null : medicationTime;
   }
 
+  /**
+   * Get Vietnam day of week
+   */
   private getVietnamDayOfWeek(dateStr: string) {
     return new Date(`${dateStr}T12:00:00.000+07:00`).getUTCDay();
   }
 
+  /**
+   * Format date in Vietnam timezone
+   */
   private formatDateInVietnam(date: Date) {
     const parts = new Intl.DateTimeFormat('en-CA', {
       timeZone: 'Asia/Ho_Chi_Minh',

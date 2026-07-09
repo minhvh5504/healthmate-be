@@ -8,6 +8,9 @@ export class PrescriptionStatusSchedulerService {
 
   constructor(private readonly prescriptionsService: PrescriptionsService) {}
 
+  /**
+   * Complete expired prescriptions on schedule
+   */
   @Cron('5 0 * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
   async completeExpiredPrescriptions() {
     const result = await this.prescriptionsService.completeExpiredPrescriptions();

@@ -16,6 +16,9 @@ export class PrescriptionsService {
     private uploadService: UploadService,
   ) {}
 
+  /**
+   * Create prescription
+   */
   async create(dto: CreatePrescriptionDto, userId: string, imageFile?: Express.Multer.File) {
     this.validateDateRange(dto.startDate, dto.endDate);
 
@@ -74,6 +77,9 @@ export class PrescriptionsService {
     }
   }
 
+  /**
+   * Get prescriptions by user
+   */
   async findAllByUser(userId: string, status?: PrescriptionStatus) {
     await this.completeExpiredPrescriptions();
 
@@ -92,6 +98,9 @@ export class PrescriptionsService {
     );
   }
 
+  /**
+   * Get prescription by id
+   */
   async findOne(id: string, userId: string) {
     await this.completeExpiredPrescriptions();
 
@@ -104,6 +113,9 @@ export class PrescriptionsService {
     );
   }
 
+  /**
+   * Update prescription
+   */
   async update(
     id: string,
     userId: string,
@@ -141,6 +153,9 @@ export class PrescriptionsService {
     );
   }
 
+  /**
+   * Delete prescription
+   */
   async remove(id: string, userId: string) {
     await this.findOwnedPrescription(id, userId);
 
@@ -153,6 +168,9 @@ export class PrescriptionsService {
     );
   }
 
+  /**
+   * Complete expired prescriptions
+   */
   async completeExpiredPrescriptions() {
     const today = this.getTodayDateInVietnam();
 
@@ -169,6 +187,9 @@ export class PrescriptionsService {
     });
   }
 
+  /**
+   * Find prescription owned by user
+   */
   private async findOwnedPrescription(id: string, userId: string) {
     const prescription = await this.prisma.prescription.findFirst({
       where: { id, userId },
@@ -183,6 +204,9 @@ export class PrescriptionsService {
     return prescription;
   }
 
+  /**
+   * Validate prescription date range
+   */
   private validateDateRange(startDateValue?: string, endDateValue?: string | null) {
     if (!startDateValue || !endDateValue) {
       return;
@@ -202,6 +226,9 @@ export class PrescriptionsService {
     }
   }
 
+  /**
+   * Resolve prescription status
+   */
   private resolvePrescriptionStatus(
     status: PrescriptionStatus | undefined,
     endDateValue?: string | Date | null,
@@ -220,11 +247,17 @@ export class PrescriptionsService {
     return status;
   }
 
+  /**
+   * Get today at Vietnam midnight
+   */
   private getTodayDateInVietnam() {
     const dateStr = this.formatDateInVietnam(new Date());
     return new Date(`${dateStr}T00:00:00.000Z`);
   }
 
+  /**
+   * Convert value to date only
+   */
   private toDateOnly(dateValue: string | Date) {
     const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
     const year = date.getUTCFullYear();
@@ -234,6 +267,9 @@ export class PrescriptionsService {
     return new Date(`${year}-${month}-${day}T00:00:00.000Z`);
   }
 
+  /**
+   * Format date in Vietnam timezone
+   */
   private formatDateInVietnam(date: Date) {
     const parts = new Intl.DateTimeFormat('en-CA', {
       timeZone: this.vietnamTimeZone,

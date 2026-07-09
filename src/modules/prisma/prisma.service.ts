@@ -11,16 +11,25 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     super({ adapter });
   }
 
+  /**
+   * Connect to database
+   */
   async onModuleInit(): Promise<void> {
     await this.$connect();
     console.log('✅ Database connected');
   }
 
+  /**
+   * Disconnect from database
+   */
   async onModuleDestroy(): Promise<void> {
     await this.$disconnect();
     console.log('👋 Database disconnected');
   }
 
+  /**
+   * Clean database for tests
+   */
   async cleanDatabase(): Promise<void> {
     if (process.env.NODE_ENV === 'production') {
       throw new Error('Cannot clean database in production!');

@@ -20,17 +20,17 @@ export class PrismaExceptionFilter extends BaseExceptionFilter {
         message = 'Bản ghi với giá trị này đã tồn tại';
         break;
       case 'P2025':
-        // Không tìm thấy bản ghi
+        // Record not found
         status = HttpStatus.NOT_FOUND;
         message = 'Không tìm thấy bản ghi';
         break;
       case 'P2003':
-        // Ràng buộc khóa ngoại không hợp lệ
+        // Invalid foreign key constraint
         status = HttpStatus.BAD_REQUEST;
         message = 'Ràng buộc khóa ngoại không hợp lệ';
         break;
       default:
-        // Lỗi Prisma không xác định
+        // Unknown Prisma error
         status = HttpStatus.INTERNAL_SERVER_ERROR;
         message = exception.message;
     }
